@@ -248,6 +248,34 @@ async function deleteData(table, id, callback) {
 }
 
 // ==========================================
+// HELPER: AUTO-LOG AKTIVITAS
+// ==========================================
+
+async function logAktivitas(pekerjaanId, jenisAktivitas, catatan, userName = null) {
+    try {
+        const currentUser = userName || (state.currentUser ? state.currentUser.nama : 'Admin');
+        const payload = {
+            action: 'create',
+            table: 'LogAktivitas',
+            user: currentUser,
+            data: {
+                pekerjaan_id: pekerjaanId,
+                tanggal: new Date().toISOString().split('T')[0], // YYYY-MM-DD
+                catatan: catatan,
+                user: currentUser,
+                jenis_aktivitas: jenisAktivitas
+            }
+        };
+        
+        await fetchAPI('', 'POST', payload);
+        console.log('✓ Log aktivitas tersimpan:', jenisAktivitas);
+    } catch (error) {
+        console.warn('× Gagal menyimpan log aktivitas:', error);
+        // Silent fail - jangan ganggu proses utama
+    }
+}
+
+// ==========================================
 // LOGIN / LOGOUT
 // ==========================================
 
@@ -345,34 +373,10 @@ function renderLogin() {
                         </button>
                     </form>
 
-                    <div class="mt-6 pt-5 border-t border-white/10">
-                        <p class="text-xs text-slate-400 text-center mb-3">Akun demo tersedia:</p>
-                        <div class="grid grid-cols-3 gap-2">
-                            <button onclick="fillDemo('admin','admin123')" class="bg-white/5 hover:bg-white/10 border border-white/10 text-xs text-sky-200 py-1.5 px-2 rounded-lg transition text-center">
-                                <div class="font-semibold">admin</div>
-                                <div class="text-[10px] text-slate-400">Administrator</div>
-                            </button>
-                            <button onclick="fillDemo('perencanaan','plan123')" class="bg-white/5 hover:bg-white/10 border border-white/10 text-xs text-sky-200 py-1.5 px-2 rounded-lg transition text-center">
-                                <div class="font-semibold">perencanaan</div>
-                                <div class="text-[10px] text-slate-400">Perencanaan</div>
-                            </button>
-                            <button onclick="fillDemo('pengawas','awas123')" class="bg-white/5 hover:bg-white/10 border border-white/10 text-xs text-sky-200 py-1.5 px-2 rounded-lg transition text-center">
-                                <div class="font-semibold">pengawas</div>
-                                <div class="text-[10px] text-slate-400">Pengawas</div>
-                            </button>
-                        </div>
-                    </div>
+                    <p class="text-center text-xs text-slate-500 mt-6">© 2026 PLN ULP Buleleng · Sistem Internal</p>
                 </div>
-
-                <p class="text-center text-xs text-slate-500 mt-6">© 2026 PLN ULP Buleleng · Sistem Internal</p>
-            </div>
         </div>
     `;
-}
-
-function fillDemo(username, password) {
-    document.getElementById('login-username').value = username;
-    document.getElementById('login-password').value = password;
 }
 
 function togglePasswordVisibility() {
@@ -529,7 +533,7 @@ function navigate(page) {
 // 4. RENDER DASHBOARD
 // ==========================================
 
-async function renderDashboard() {
+async function renderDashboard(filters = {}) {
     const contentArea = document.getElementById('app-content');
     if (!contentArea) return;
     contentArea.innerHTML = '<div class="flex justify-center items-center py-24"><div class="loader"></div></div>';
@@ -542,10 +546,42 @@ async function renderDashboard() {
         fetchAPI('action=list&table=Pengadaan') || []
     ]);
 
-    const pekerjaanArr = Array.isArray(pekerjaanList) ? pekerjaanList : [];
-    const kontrakArr = Array.isArray(kontrakList) ? kontrakList : [];
-    const realisasiArr = Array.isArray(realisasiList) ? realisasiList : [];
+    let pekerjaanArr = Array.isArray(pekerjaanList) ? pekerjaanList : [];
+    let kontrakArr = Array.isArray(kontrakList) ? kontrakList : [];
+    let realisasiArr = Array.isArray(realisasiList) ? realisasiList : [];
     const pengadaanArr = Array.isArray(pengadaanList) ? pengadaanList : [];
+
+    // Build lokasi dropdown options SEBELUM filter
+    const lokasiUnique = [...new Set(pekerjaanArr.map(p => p.lokasi).filter(l => l))].sort();
+    window.dashboardLokasiOptions = lokasiUnique;
+
+    // Apply filters
+    const filterTahun = filters.tahun || '';
+    const filterLokasi = filters.lokasi || '';
+    const filterStatus = filters.status || '';
+
+    if (filterTahun) {
+        pekerjaanArr = pekerjaanArr.filter(p => String(p.tahun_anggaran) === String(filterTahun));
+    }
+    if (filterLokasi) {
+        pekerjaanArr = pekerjaanArr.filter(p => (p.lokasi || '') === filterLokasi);
+    }
+
+    // Filter kontrak berdasarkan pekerjaan tersisa
+    const pekerjaanIds = pekerjaanArr.map(p => String(p.id));
+    kontrakArr = kontrakArr.filter(k => pekerjaanIds.includes(String(k.pekerjaan_id)));
+    
+    if (filterStatus) {
+        kontrakArr = kontrakArr.filter(k => {
+            const st = (k.status || 'On Progress').toLowerCase();
+            const fs = filterStatus.toLowerCase();
+            if (fs === 'on progress') return !st.includes('selesai') && !st.includes('batal') && !st.includes('tunda') && !st.includes('belum');
+            return st.includes(fs);
+        });
+    }
+
+    // Filter realisasi
+    realisasiArr = realisasiArr.filter(r => pekerjaanIds.includes(String(r.pekerjaan_id)));
 
     let totalNilaiKontrak = 0;
     kontrakArr.forEach(k => {
@@ -666,6 +702,44 @@ async function renderDashboard() {
     }
 
     contentArea.innerHTML = `
+        <!-- FILTER SECTION -->
+        <div class="bg-white p-4 rounded-xl shadow-sm border border-slate-100 mb-6">
+            <div class="flex flex-col md:flex-row gap-3 items-end">
+                <div class="flex-1 grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <div>
+                        <label class="block text-xs font-medium text-slate-600 mb-1.5">Tahun Anggaran</label>
+                        <select id="dash-filter-tahun" onchange="applyDashboardFilter()" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:border-brand outline-none bg-white">
+                            <option value="">Semua Tahun</option>
+                            <option value="2024">2024</option>
+                            <option value="2025">2025</option>
+                            <option value="2026" selected>2026</option>
+                            <option value="2027">2027</option>
+                            <option value="2028">2028</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-slate-600 mb-1.5">Lokasi / ULP</label>
+                        <select id="dash-filter-lokasi" onchange="applyDashboardFilter()" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:border-brand outline-none bg-white">
+                            <option value="">Semua Lokasi</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-slate-600 mb-1.5">Status Pekerjaan</label>
+                        <select id="dash-filter-status" onchange="applyDashboardFilter()" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:border-brand outline-none bg-white">
+                            <option value="">Semua Status</option>
+                            <option value="Selesai">Selesai</option>
+                            <option value="On Progress">On Progress</option>
+                            <option value="Belum Mulai">Belum Mulai</option>
+                            <option value="Tunda">Tunda</option>
+                        </select>
+                    </div>
+                </div>
+                <button onclick="resetDashboardFilter()" class="border border-slate-300 hover:bg-slate-50 text-slate-600 rounded-lg px-4 py-2 text-sm font-medium flex items-center gap-2 transition whitespace-nowrap">
+                    <i data-lucide="x-circle" class="w-4 h-4"></i> Reset Filter
+                </button>
+            </div>
+        </div>
+
         <!-- BARIS 1: FILTER, KARTU STATISTIK & BANNER PLN -->
         <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
             <div class="lg:col-span-2 bg-white p-5 rounded-xl shadow-sm border border-slate-100 flex flex-col justify-between">
@@ -859,7 +933,34 @@ async function renderDashboard() {
     `;
 
     lucide.createIcons();
+    
+    // Populate lokasi dropdown
+    const lokasiDropdown = document.getElementById('dash-filter-lokasi');
+    if (lokasiDropdown && window.dashboardLokasiOptions) {
+        let lokasiHTML = '<option value="">Semua Lokasi</option>';
+        window.dashboardLokasiOptions.forEach(lok => {
+            const selected = lok === filterLokasi ? 'selected' : '';
+            lokasiHTML += `<option value="${lok}" ${selected}>${lok}</option>`;
+        });
+        lokasiDropdown.innerHTML = lokasiHTML;
+    }
+    
+    // Set filter values
+    if (document.getElementById('dash-filter-tahun')) document.getElementById('dash-filter-tahun').value = filterTahun;
+    if (document.getElementById('dash-filter-status')) document.getElementById('dash-filter-status').value = filterStatus;
+    
     initDashboardCharts(realisasiKumulatif, rencanaKumulatif, realisasiPerBulan, komposisiLabels, komposisiValues, statusCounts);
+}
+
+function applyDashboardFilter() {
+    const tahun = document.getElementById('dash-filter-tahun')?.value || '';
+    const lokasi = document.getElementById('dash-filter-lokasi')?.value || '';
+    const status = document.getElementById('dash-filter-status')?.value || '';
+    renderDashboard({ tahun, lokasi, status });
+}
+
+function resetDashboardFilter() {
+    renderDashboard({});
 }
 
 function initDashboardCharts(realisasiKumulatif = [], rencanaKumulatif = [], realisasiPerBulan = [], komposisiLabels = [], komposisiValues = [], statusCounts = {}) {
@@ -1101,14 +1202,6 @@ async function renderRAB() {
                     <input type="hidden" id="modal-edit-index" value="">
                     <div class="space-y-5">
                         <div>
-                            <label class="block text-sm font-semibold text-slate-700 mb-1.5">Kategori Jaringan</label>
-                            <select id="modal-kategori" class="w-full border border-slate-300 rounded-xl px-4 py-3 text-sm focus:border-brand outline-none bg-white">
-                                <option value="JTM">JTM (Jaringan Tegangan Menengah)</option>
-                                <option value="JTR">JTR (Jaringan Tegangan Rendah)</option>
-                                <option value="Umum">Umum / Lainnya</option>
-                            </select>
-                        </div>
-                        <div>
                             <label class="block text-sm font-semibold text-slate-700 mb-1.5">Uraian Pekerjaan / Material</label>
                             <input type="text" id="modal-uraian" required placeholder="Contoh: Tiang Beton 13/350/350+E daN" class="w-full border border-slate-300 rounded-xl px-4 py-3 text-sm focus:border-brand outline-none">
                         </div>
@@ -1173,14 +1266,13 @@ async function renderRAB() {
 
 async function handleSelectPekerjaanRAB(id) {
     state.selectedPekerjaanRAB = id;
-    const infoContainer = document.getElementById('rab-info-pekerjaan');
 
     if (window.allPekerjaanList) {
         const selectedObj = window.allPekerjaanList.find(p => String(p.id) === String(id));
         state.selectedPekerjaanNamaRAB = selectedObj ? selectedObj.nama_pekerjaan : '';
         state.selectedPengadaanIdRAB = selectedObj ? (selectedObj.pengadaan_id || '') : '';
 
-        // Cari Pengadaan terkait untuk Tahun & Sumber Anggaran
+        // Cari Pengadaan terkait (untuk nama pengadaan saja)
         let pengadaanObj = null;
         if (state.selectedPengadaanIdRAB && window.allPengadaanList) {
             pengadaanObj = window.allPengadaanList.find(p => String(p.id) === String(state.selectedPengadaanIdRAB));
@@ -1188,13 +1280,36 @@ async function handleSelectPekerjaanRAB(id) {
 
         state.selectedPengadaanNamaRAB = pengadaanObj ? pengadaanObj.nama_pengadaan : (selectedObj ? selectedObj.nama_pengadaan : '');
 
-        // UPDATE UI PANEL INFO PEKERJAAN
-        if (selectedObj && infoContainer) {
-            document.getElementById('info-tahun').innerText = pengadaanObj ? pengadaanObj.tahun : '-';
-            document.getElementById('info-sumber').innerText = pengadaanObj ? (pengadaanObj.sumber_anggaran || 'APLN') : '-';
-            document.getElementById('info-lokasi').innerText = selectedObj.lokasi || '-';
-            document.getElementById('info-kegiatan').innerText = selectedObj.jenis_kegiatan || '-';
-            document.getElementById('info-volume').innerText = selectedObj.volume_paket || '-';
+        // DEBUG: Log data pekerjaan yang dipilih
+        console.log('=== DEBUG PEKERJAAN SELECTED ===');
+        console.log('Pekerjaan Object:', selectedObj);
+        console.log('Tahun Anggaran:', selectedObj ? selectedObj.tahun_anggaran : 'TIDAK ADA');
+        console.log('Sumber Anggaran:', selectedObj ? selectedObj.sumber_anggaran : 'TIDAK ADA');
+
+        // UPDATE UI PANEL INFO PEKERJAAN - AMBIL DARI PEKERJAAN LANGSUNG
+        if (selectedObj) {
+            // Tahun & Sumber Anggaran dari Pekerjaan (bukan Pengadaan)
+            const tahunEl = document.getElementById('info-tahun');
+            const sumberEl = document.getElementById('info-sumber');
+            const lokasiEl = document.getElementById('info-lokasi');
+            const kegiatanEl = document.getElementById('info-kegiatan');
+            const volumeEl = document.getElementById('info-volume');
+            
+            // Set nilai dengan fallback ke pengadaan jika kosong di pekerjaan
+            const tahunValue = selectedObj.tahun_anggaran || (pengadaanObj ? pengadaanObj.tahun : '-');
+            const sumberValue = selectedObj.sumber_anggaran || (pengadaanObj ? pengadaanObj.sumber_anggaran : '-');
+            
+            if (tahunEl) {
+                tahunEl.innerText = tahunValue;
+                console.log('Set info-tahun to:', tahunValue);
+            }
+            if (sumberEl) {
+                sumberEl.innerText = sumberValue;
+                console.log('Set info-sumber to:', sumberValue);
+            }
+            if (lokasiEl) lokasiEl.innerText = selectedObj.lokasi || '-';
+            if (kegiatanEl) kegiatanEl.innerText = selectedObj.jenis_kegiatan || '-';
+            if (volumeEl) volumeEl.innerText = selectedObj.volume_paket || '-';
         }
     }
 
@@ -1230,7 +1345,7 @@ async function handleSelectPekerjaanRAB(id) {
         if (state.tempRABItems.length === 0) {
             state.tempRABItems.push({
                 id: 'temp_' + Date.now(),
-                kategori: 'JTM',
+                kategori: 'Umum',
                 uraian: '',
                 satuan: '',
                 volume: 1,
@@ -1255,7 +1370,6 @@ function showModalRAB(editIndex = null) {
     document.getElementById('form-rab').reset();
     document.getElementById('modal-edit-index').value = '';
     document.getElementById('modal-rab-title').innerText = 'Tambah Item RAB';
-    document.getElementById('modal-kategori').value = 'JTM';
     document.getElementById('modal-volume').value = '1';
     document.getElementById('modal-jumlah-preview').value = 'Rp 0';
     document.getElementById('modal-preview-mat').innerText = 'Rp 0';
@@ -1265,7 +1379,6 @@ function showModalRAB(editIndex = null) {
         const item = state.tempRABItems[editIndex];
         document.getElementById('modal-rab-title').innerText = 'Edit Item RAB';
         document.getElementById('modal-edit-index').value = editIndex;
-        document.getElementById('modal-kategori').value = item.kategori || 'JTM';
         document.getElementById('modal-uraian').value = item.uraian;
         document.getElementById('modal-satuan').value = item.satuan;
         document.getElementById('modal-volume').value = item.volume;
@@ -1445,7 +1558,7 @@ function saveItemModalToTemp(event) {
     
     const newItem = {
         id: 'temp_' + Date.now(), // Selalu generate ID baru
-        kategori: document.getElementById('modal-kategori').value,
+        kategori: 'Umum', // Default, tidak ada input kategori lagi
         uraian: document.getElementById('modal-uraian').value,
         satuan: document.getElementById('modal-satuan').value,
         volume: parseFloat(document.getElementById('modal-volume').value) || 0,
@@ -2357,7 +2470,7 @@ async function renderKontrak() {
     let optPekerjaan = '<option value="">-- Pilih Nama Pekerjaan --</option>';
     window.allPekerjaanListKontrak.forEach(p => {
         const label = (p.nomor_paket ? p.nomor_paket + ' - ' : '') + p.nama_pekerjaan;
-        optPekerjaan += `<option value="${p.nama_pekerjaan}">${label}</option>`;
+        optPekerjaan += `<option value="${p.nama_pekerjaan}" data-id="${p.id}">${label}</option>`;
     });
 
     let optPenyedia = '<option value="">-- Pilih Penyedia --</option>';
@@ -2471,10 +2584,11 @@ async function loadKontrakData() {
                 <thead>
                     <tr class="bg-slate-100 border-b border-slate-200 uppercase text-slate-700 font-semibold">
                         <th class="px-4 py-3 text-center w-12">No</th>
-                        <th class="px-4 py-3">Nomor Kontrak</th>
                         <th class="px-4 py-3">Pekerjaan & Penyedia</th>
+                        <th class="px-4 py-3">Nomor Kontrak</th>
                         <th class="px-4 py-3 text-right">Nilai Kontrak (Rp)</th>
                         <th class="px-4 py-3">Masa Pelaksanaan</th>
+                        <th class="px-4 py-3 text-center">Status</th>
                         <th class="px-4 py-3 text-center w-20">Aksi</th>
                     </tr>
                 </thead>
@@ -2482,16 +2596,40 @@ async function loadKontrakData() {
     `;
 
     if (kontrakList.length === 0) {
-        html += '<tr><td colspan="5" class="px-4 py-8 text-center text-slate-400 italic">Belum ada data kontrak tercatat.</td></tr>';
+        html += '<tr><td colspan="7" class="px-4 py-8 text-center text-slate-400 italic">Belum ada data kontrak tercatat.</td></tr>';
     } else {
         kontrakList.forEach((k, index) => {
+            // Tentukan badge status
+            let statusBadge = '';
+            const status = k.status || 'Aktif';
+            switch(status) {
+                case 'Aktif':
+                    statusBadge = '<span class="px-2 py-1 bg-green-100 text-green-700 rounded text-[10px] font-semibold">Aktif</span>';
+                    break;
+                case 'On Progress':
+                    statusBadge = '<span class="px-2 py-1 bg-blue-100 text-blue-700 rounded text-[10px] font-semibold">On Progress</span>';
+                    break;
+                case 'Selesai':
+                    statusBadge = '<span class="px-2 py-1 bg-gray-100 text-gray-700 rounded text-[10px] font-semibold">Selesai</span>';
+                    break;
+                case 'Tunda':
+                    statusBadge = '<span class="px-2 py-1 bg-yellow-100 text-yellow-700 rounded text-[10px] font-semibold">Tunda</span>';
+                    break;
+                case 'Batal':
+                    statusBadge = '<span class="px-2 py-1 bg-red-100 text-red-700 rounded text-[10px] font-semibold">Batal</span>';
+                    break;
+                default:
+                    statusBadge = `<span class="px-2 py-1 bg-slate-100 text-slate-700 rounded text-[10px] font-semibold">${status}</span>`;
+            }
+            
             html += `
                 <tr class="hover:bg-slate-50 transition-colors">
                     <td class="px-4 py-3 text-center text-slate-500">${index + 1}</td>
-                    <td class="px-4 py-3 font-bold text-slate-800">${k.nomor_kontrak}</td>
                     <td class="px-4 py-3 text-slate-700 font-medium">${k.nama_pekerjaan || '-'}<br><span class="text-[10px] text-slate-500">${k.nama_penyedia || '-'}</span></td>
+                    <td class="px-4 py-3 font-bold text-slate-800">${k.nomor_kontrak}</td>
                     <td class="px-4 py-3 text-right font-semibold text-emerald-600">${CONFIG.formatCurrency(k.nilai_kontrak)}</td>
-                    <td class="px-4 py-3 text-slate-600">${k.tanggal_mulai || '-'} s.d ${k.tanggal_selesai || '-'}</td>
+                    <td class="px-4 py-3 text-slate-600 text-xs">${k.tanggal_mulai || '-'} s.d ${k.tanggal_selesai || '-'}</td>
+                    <td class="px-4 py-3 text-center">${statusBadge}</td>
                     <td class="px-4 py-3 text-center flex justify-center gap-2">
                         <button onclick="editKontrak('${k.id}')" class="text-blue-500 hover:text-blue-700 p-1"><i data-lucide="edit" class="w-4 h-4"></i></button>
                         <button onclick="deleteData('Kontrak', '${k.id}', loadKontrakData)" class="text-red-400 hover:text-red-600 p-1"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
@@ -2588,12 +2726,20 @@ async function saveKontrak(event) {
     const selPekEl = document.getElementById('kontrak-pekerjaan');
     const manualPekEl = document.getElementById('kontrak-pekerjaan-manual');
     const namaPekerjaan = (selPekEl && selPekEl.value) ? selPekEl.value : (manualPekEl ? manualPekEl.value : '');
+    
+    // Ambil pekerjaan_id dari dropdown option dataset
+    let pekerjaanId = '';
+    if (selPekEl && selPekEl.value) {
+        const selectedOption = selPekEl.options[selPekEl.selectedIndex];
+        pekerjaanId = selectedOption ? selectedOption.dataset.id || '' : '';
+    }
 
     const selPenEl = document.getElementById('kontrak-penyedia');
     const manualPenEl = document.getElementById('kontrak-penyedia-manual');
     const namaPenyedia = (selPenEl && selPenEl.value) ? selPenEl.value : (manualPenEl ? manualPenEl.value : '');
 
     const data = {
+        pekerjaan_id: pekerjaanId, // Tambahkan pekerjaan_id untuk relasi
         nomor_kontrak: document.getElementById('kontrak-nomor').value,
         nama_pekerjaan: namaPekerjaan,
         nama_penyedia: namaPenyedia,
@@ -2644,6 +2790,18 @@ async function saveKontrak(event) {
         }
 
         if (result) {
+            // Auto-log aktivitas kontrak
+            const pekerjaanId = data.pekerjaan_id || 'UNKNOWN'; // Jika ada relasi ke pekerjaan
+            const jenisAktivitas = isUpdate ? 'Update Kontrak' : 'Tambah Kontrak';
+            const catatan = isUpdate 
+                ? `Memperbarui kontrak "${data.nomor_kontrak}" - Pekerjaan: ${data.nama_pekerjaan}, Penyedia: ${data.nama_penyedia}, Status: ${data.status}`
+                : `Menambahkan kontrak baru "${data.nomor_kontrak}" - Pekerjaan: ${data.nama_pekerjaan}, Penyedia: ${data.nama_penyedia}, Nilai: ${CONFIG.formatCurrency(data.nilai_kontrak)}`;
+            
+            // Log only if we have valid pekerjaan_id, otherwise skip
+            if (pekerjaanId !== 'UNKNOWN') {
+                await logAktivitas(pekerjaanId, jenisAktivitas, catatan, currentUser);
+            }
+            
             showToast(isUpdate ? 'Kontrak diperbarui' : 'Kontrak berhasil disimpan');
             closeModalKontrak();
             state.editId = null; // Reset edit mode
@@ -2842,9 +3000,50 @@ async function renderPekerjaan() {
                                 <input type="text" id="pek-volume" placeholder="Misal: 5 Kms" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm outline-none focus:border-brand">
                             </div>
                         </div>
-                        <div>
-                            <label class="block text-sm font-medium mb-1">Lokasi (ULP / UP3)</label>
-                            <input type="text" id="pek-lokasi" required placeholder="Misal: ULP Tabanan" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm outline-none focus:border-brand">
+                        <div class="grid grid-cols-2 gap-4">
+                            <div>
+                                <label class="block text-sm font-medium mb-1">Jenis Tegangan *</label>
+                                <select id="pek-tegangan" required class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm outline-none focus:border-brand">
+                                    <option value="">-- Pilih Jenis Tegangan --</option>
+                                    <option value="JTM">JTM (Jaringan Tegangan Menengah)</option>
+                                    <option value="JTR">JTR (Jaringan Tegangan Rendah)</option>
+                                    <option value="Umum">Umum / Lainnya</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium mb-1">Lokasi (ULP / UP3) *</label>
+                                <input type="text" id="pek-lokasi" required placeholder="Misal: ULP Tabanan" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm outline-none focus:border-brand">
+                            </div>
+                        </div>
+                        <div class="grid grid-cols-2 gap-4">
+                            <div>
+                                <label class="block text-sm font-medium mb-1">Tahun Anggaran *</label>
+                                <select id="pek-tahun" required class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm outline-none focus:border-brand">
+                                    <option value="">-- Pilih Tahun --</option>
+                                    <option value="2024">2024</option>
+                                    <option value="2025">2025</option>
+                                    <option value="2026" selected>2026</option>
+                                    <option value="2027">2027</option>
+                                    <option value="2028">2028</option>
+                                    <option value="2029">2029</option>
+                                    <option value="2030">2030</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium mb-1">Sumber Anggaran *</label>
+                                <input type="text" id="pek-sumber" list="sumber-anggaran-list" required placeholder="Pilih atau ketik manual" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm outline-none focus:border-brand">
+                                <datalist id="sumber-anggaran-list">
+                                    <option value="APBN">APBN</option>
+                                    <option value="APBD Provinsi">APBD Provinsi</option>
+                                    <option value="APBD Kab/Kota">APBD Kabupaten/Kota</option>
+                                    <option value="Hibah">Hibah</option>
+                                    <option value="Swadaya">Swadaya Masyarakat</option>
+                                    <option value="Dana Desa">Dana Desa</option>
+                                    <option value="CSR">CSR (Corporate Social Responsibility)</option>
+                                    <option value="APLN">APLN (Anggaran PLN)</option>
+                                </datalist>
+                                <p class="text-[10px] text-slate-400 mt-1">💡 Bisa pilih atau ketik sumber dana lain</p>
+                            </div>
                         </div>
                     </div>
                     <div class="mt-6 flex justify-end gap-3">
@@ -2861,9 +3060,11 @@ async function renderPekerjaan() {
 
 async function loadPekerjaanData() {
     const data = await fetchAPI('action=list&table=Pekerjaan') || [];
-    let html = `<div class="overflow-x-auto"><table class="w-full text-left border-collapse text-sm"><thead class="bg-slate-100"><tr><th class="p-3">No</th><th class="p-3">Nama Pekerjaan</th><th class="p-3">Jenis & Volume</th><th class="p-3">Lokasi</th><th class="p-3">Aksi</th></tr></thead><tbody class="divide-y">`;
+    let html = `<div class="overflow-x-auto"><table class="w-full text-left border-collapse text-sm"><thead class="bg-slate-100"><tr><th class="p-3">No</th><th class="p-3">Nama Pekerjaan</th><th class="p-3">Jenis Tegangan</th><th class="p-3">Jenis & Volume</th><th class="p-3">Lokasi</th><th class="p-3">Aksi</th></tr></thead><tbody class="divide-y">`;
     data.forEach((p, i) => {
-        html += `<tr><td class="p-3">${i + 1}</td><td class="p-3 font-semibold">${p.nama_pekerjaan}<br><span class="text-[10px] text-slate-500 font-normal">Pengadaan: ${p.nama_pengadaan || 'Tanpa Pengadaan Induk'}</span></td><td class="p-3">${p.jenis_kegiatan || '-'}<br><b class="text-xs text-brand">${p.volume_paket || '-'}</b></td><td class="p-3">${p.lokasi || '-'}</td><td class="p-3 flex gap-2"><button onclick="editPekerjaan('${p.id}')" class="text-blue-500 hover:text-blue-700"><i data-lucide="edit" class="w-4 h-4"></i></button><button onclick="deleteData('Pekerjaan', '${p.id}', loadPekerjaanData)" class="text-red-500 hover:text-red-700"><i data-lucide="trash-2" class="w-4 h-4"></i></button></td></tr>`;
+        const teganganBadge = p.jenis_tegangan === 'JTM' ? 'bg-purple-100 text-purple-700' : (p.jenis_tegangan === 'JTR' ? 'bg-orange-100 text-orange-700' : 'bg-slate-100 text-slate-700');
+        const teganganLabel = p.jenis_tegangan || '-';
+        html += `<tr><td class="p-3">${i + 1}</td><td class="p-3 font-semibold">${p.nama_pekerjaan}<br><span class="text-[10px] text-slate-500 font-normal">Pengadaan: ${p.nama_pengadaan || 'Tanpa Pengadaan Induk'}</span></td><td class="p-3"><span class="px-2 py-1 rounded text-xs font-semibold ${teganganBadge}">${teganganLabel}</span></td><td class="p-3">${p.jenis_kegiatan || '-'}<br><b class="text-xs text-brand">${p.volume_paket || '-'}</b></td><td class="p-3">${p.lokasi || '-'}</td><td class="p-3 flex gap-2"><button onclick="editPekerjaan('${p.id}')" class="text-blue-500 hover:text-blue-700"><i data-lucide="edit" class="w-4 h-4"></i></button><button onclick="deleteData('Pekerjaan', '${p.id}', loadPekerjaanData)" class="text-red-500 hover:text-red-700"><i data-lucide="trash-2" class="w-4 h-4"></i></button></td></tr>`;
     });
     html += `</tbody></table></div>`;
     document.getElementById('pekerjaan-table-container').innerHTML = html;
@@ -2878,7 +3079,10 @@ function showModalPekerjaan(isEdit = false) {
         document.getElementById('pek-nama').value = '';
         document.getElementById('pek-jenis').value = '';
         document.getElementById('pek-volume').value = '';
+        document.getElementById('pek-tegangan').value = '';
         document.getElementById('pek-lokasi').value = '';
+        document.getElementById('pek-tahun').value = '2026'; // Default current year
+        document.getElementById('pek-sumber').value = '';
     }
     document.getElementById('modal-pekerjaan').classList.remove('hidden', 'opacity-0'); 
 }
@@ -2895,7 +3099,10 @@ async function editPekerjaan(id) {
     document.getElementById('pek-nama').value = item.nama_pekerjaan || '';
     document.getElementById('pek-jenis').value = item.jenis_kegiatan || '';
     document.getElementById('pek-volume').value = item.volume_paket || '';
+    document.getElementById('pek-tegangan').value = item.jenis_tegangan || '';
     document.getElementById('pek-lokasi').value = item.lokasi || '';
+    document.getElementById('pek-tahun').value = item.tahun_anggaran || '2026';
+    document.getElementById('pek-sumber').value = item.sumber_anggaran || '';
     
     showModalPekerjaan(true);
 }
@@ -2914,15 +3121,31 @@ async function savePekerjaan(e) {
             nama_pekerjaan: document.getElementById('pek-nama').value,
             jenis_kegiatan: document.getElementById('pek-jenis').value,
             volume_paket: document.getElementById('pek-volume').value,
-            lokasi: document.getElementById('pek-lokasi').value
+            jenis_tegangan: document.getElementById('pek-tegangan').value,
+            lokasi: document.getElementById('pek-lokasi').value,
+            tahun_anggaran: document.getElementById('pek-tahun').value,
+            sumber_anggaran: document.getElementById('pek-sumber').value
         }
     };
     if (state.editId) payload.id = state.editId;
 
-    await fetchAPI('', 'POST', payload);
-    showToast(state.editId ? 'Data Pekerjaan diperbarui' : 'Data Pekerjaan disimpan');
-    closeModalPekerjaan();
-    loadPekerjaanData();
+    const result = await fetchAPI('', 'POST', payload);
+    
+    if (result) {
+        // Auto-log aktivitas
+        const currentUser = state.currentUser ? state.currentUser.nama : 'Admin';
+        const jenisAktivitas = state.editId ? 'Update Pekerjaan' : 'Tambah Pekerjaan';
+        const namaPekerjaan = payload.data.nama_pekerjaan;
+        const catatan = state.editId 
+            ? `Memperbarui data pekerjaan "${namaPekerjaan}" - Tahun: ${payload.data.tahun_anggaran}, Sumber: ${payload.data.sumber_anggaran}, Jenis Tegangan: ${payload.data.jenis_tegangan}`
+            : `Menambahkan pekerjaan baru "${namaPekerjaan}" - Tahun: ${payload.data.tahun_anggaran}, Sumber: ${payload.data.sumber_anggaran}`;
+        
+        await logAktivitas(result.id || state.editId, jenisAktivitas, catatan, currentUser);
+        
+        showToast(state.editId ? 'Data Pekerjaan diperbarui' : 'Data Pekerjaan disimpan');
+        closeModalPekerjaan();
+        loadPekerjaanData();
+    }
 }
 
 // ==========================================
@@ -2957,11 +3180,13 @@ async function renderMaterial() {
                 <form onsubmit="saveMaterial(event)">
                     <div class="space-y-4">
                         <div>
-                            <label class="block text-sm font-medium mb-1 text-slate-700">Kategori Material</label>
-                            <input type="text" id="mat-kategori" list="kategori-material-list" placeholder="Pilih atau ketik kategori (JTM, JTR, Gardu, dsb)" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm outline-none focus:border-brand">
+                            <label class="block text-sm font-medium mb-1 text-slate-700">Nama Material / Uraian *</label>
+                            <input type="text" id="mat-nama" required placeholder="Contoh: Kabel TIC 3 x 70 + 1 x 54.6 mm2, Tiang Beton 9m" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm outline-none focus:border-brand">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium mb-1 text-slate-700">Kategori Material (Opsional)</label>
+                            <input type="text" id="mat-kategori" list="kategori-material-list" placeholder="Pilih atau ketik kategori (Kabel, Tiang, Gardu, dsb)" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm outline-none focus:border-brand">
                             <datalist id="kategori-material-list">
-                                <option value="JTM (Jaringan Tegangan Menengah)"></option>
-                                <option value="JTR (Jaringan Tegangan Rendah)"></option>
                                 <option value="Gardu Distribusi"></option>
                                 <option value="Trafo Distribusi"></option>
                                 <option value="Tiang & Aksesoris"></option>
@@ -2970,10 +3195,6 @@ async function renderMaterial() {
                                 <option value="Alat Pengukur & Pembatas (APP)"></option>
                                 <option value="Umum"></option>
                             </datalist>
-                        </div>
-                        <div>
-                            <label class="block text-sm font-medium mb-1 text-slate-700">Nama Material / Uraian *</label>
-                            <input type="text" id="mat-nama" required placeholder="Contoh: Kabel TIC 3 x 70 + 1 x 54.6 mm2, Tiang Beton 9m" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm outline-none focus:border-brand">
                         </div>
                         <div class="grid grid-cols-2 gap-4">
                             <div>
@@ -2999,6 +3220,7 @@ async function renderMaterial() {
                         <div>
                             <label class="block text-sm font-medium mb-1 text-slate-700">Harga Jasa (Opsional, Rp)</label>
                             <input type="number" id="mat-jasa" min="0" value="0" onfocus="if(this.value=='0')this.value=''" onblur="if(this.value=='')this.value='0'" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm outline-none focus:border-brand">
+                            <p class="text-[10px] text-slate-400 mt-1">*Jenis tegangan (JTM/JTR) ditentukan saat input Pekerjaan, bukan di material</p>
                         </div>
                     </div>
                     <div class="mt-6 flex justify-end gap-3 pt-4 border-t border-slate-100">
@@ -3223,7 +3445,7 @@ async function saveMaterial(e) {
 // 12. MODUL LAPORAN & MONITORING
 // ==========================================
 
-async function renderLaporan() {
+async function renderLaporan(filters = {}) {
     const contentArea = document.getElementById('app-content');
 
     // Fetch semua data yang dibutuhkan secara paralel
@@ -3233,10 +3455,57 @@ async function renderLaporan() {
         fetchAPI('action=list&table=Realisasi'),
         fetchAPI('action=list&table=Penyedia')
     ]);
-    const pekerjaan  = pekerjaanList  || [];
-    const kontrak    = kontrakList    || [];
-    const realisasi  = realisasiList  || [];
+    
+    let pekerjaan  = pekerjaanList  || [];
+    let kontrak    = kontrakList    || [];
+    let realisasi  = realisasiList  || [];
     const penyedia   = penyediaList   || [];
+
+    // Build lokasi dan tahun options SEBELUM filter
+    const lokasiUnique = [...new Set(pekerjaan.map(p => p.lokasi).filter(l => l))].sort();
+    const tahunUnique = [...new Set(pekerjaan.map(p => p.tahun_anggaran).filter(t => t))].sort().reverse();
+    window.laporanLokasiOptions = lokasiUnique;
+    window.laporanTahunOptions = tahunUnique;
+
+    // Apply filters
+    const filterTahun = filters.tahun || '';
+    const filterLokasi = filters.lokasi || '';
+    const filterPenyedia = filters.penyedia || '';
+    const filterStatus = filters.status || '';
+
+    // Filter pekerjaan
+    if (filterTahun) {
+        pekerjaan = pekerjaan.filter(p => String(p.tahun_anggaran) === String(filterTahun));
+    }
+    if (filterLokasi) {
+        pekerjaan = pekerjaan.filter(p => (p.lokasi || '') === filterLokasi);
+    }
+
+    // Filter kontrak berdasarkan pekerjaan tersisa
+    const pekerjaanIds = pekerjaan.map(p => String(p.id));
+    kontrak = kontrak.filter(k => pekerjaanIds.includes(String(k.pekerjaan_id)));
+    
+    // Filter by penyedia - gunakan nama_penyedia karena tidak ada penyedia_id di tabel Kontrak
+    if (filterPenyedia) {
+        kontrak = kontrak.filter(k => String(k.nama_penyedia || '').toLowerCase().includes(String(filterPenyedia).toLowerCase()));
+    }
+    
+    // Filter by status
+    if (filterStatus) {
+        kontrak = kontrak.filter(k => {
+            const st = (k.status || 'On Progress').toLowerCase();
+            const fs = filterStatus.toLowerCase();
+            if (fs === 'on progress') return !st.includes('selesai') && !st.includes('batal') && !st.includes('tunda') && !st.includes('belum');
+            return st.includes(fs);
+        });
+    }
+
+    // Update pekerjaan sesuai kontrak tersisa
+    const kontrakPekerjaanIds = kontrak.map(k => String(k.pekerjaan_id));
+    pekerjaan = pekerjaan.filter(p => kontrakPekerjaanIds.includes(String(p.id)));
+
+    // Filter realisasi
+    realisasi = realisasi.filter(r => kontrakPekerjaanIds.includes(String(r.pekerjaan_id)));
 
     // === HITUNG KPI ===
     // Total nilai kontrak
@@ -3262,30 +3531,63 @@ async function renderLaporan() {
     // Format angka ke satuan juta/milyar
     const fmtM = (v) => v >= 1e9 ? `Rp ${(v/1e9).toFixed(2)} M` : `Rp ${(v/1e6).toFixed(0)} Jt`;
 
-    // Build opsi penyedia untuk filter
+    // Build opsi penyedia untuk filter - ambil dari kontrak (distinct nama_penyedia)
+    const penyediaUnik = [...new Set(kontrakList.map(k => k.nama_penyedia).filter(p => p))].sort();
     let optPenyedia = '<option value="">Semua Penyedia</option>';
-    penyedia.forEach(p => {
-        optPenyedia += `<option value="${p.id}">${p.nama || p.nama_perusahaan}</option>`;
+    penyediaUnik.forEach(nama => {
+        optPenyedia += `<option value="${nama}">${nama}</option>`;
     });
     const pekerjaanData = pekerjaan;
     
     contentArea.innerHTML = `
+        <!-- FILTER SECTION -->
+        <div class="bg-white p-4 rounded-xl shadow-sm border border-slate-100 mb-6">
+            <div class="flex flex-col md:flex-row gap-3 items-end">
+                <div class="flex-1 grid grid-cols-1 sm:grid-cols-4 gap-3">
+                    <div>
+                        <label class="block text-xs font-medium text-slate-600 mb-1.5">Tahun Anggaran</label>
+                        <select id="filter-tahun-lap" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:border-brand outline-none bg-white">
+                            <option value="">Semua Tahun</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-slate-600 mb-1.5">Lokasi / ULP</label>
+                        <select id="filter-lokasi-lap" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:border-brand outline-none bg-white">
+                            <option value="">Semua Lokasi</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-slate-600 mb-1.5">Penyedia</label>
+                        <select id="filter-penyedia-lap" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:border-brand outline-none bg-white">
+                            ${optPenyedia}
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-slate-600 mb-1.5">Status</label>
+                        <select id="filter-status-lap" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:border-brand outline-none bg-white">
+                            <option value="">Semua Status</option>
+                            <option value="On Progress">On Progress</option>
+                            <option value="Selesai">Selesai</option>
+                            <option value="Belum Mulai">Belum Mulai</option>
+                            <option value="Tunda">Tunda</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="flex gap-2">
+                    <button onclick="applyLaporanFilter()" class="bg-brand text-white px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2 transition hover:bg-sky-700 whitespace-nowrap shadow-sm">
+                        <i data-lucide="filter" class="w-4 h-4"></i> Terapkan Filter
+                    </button>
+                    <button onclick="resetLaporanFilter()" class="border border-slate-300 hover:bg-slate-50 text-slate-600 rounded-lg px-4 py-2 text-sm font-medium flex items-center gap-2 transition whitespace-nowrap">
+                        <i data-lucide="x-circle" class="w-4 h-4"></i> Reset
+                    </button>
+                </div>
+            </div>
+        </div>
+
         <div class="mb-6 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
             <div>
                 <h2 class="text-xl font-bold text-slate-800">Laporan & Monitoring</h2>
                 <p class="text-sm text-slate-500">Realisasi fisik, keuangan dan progres pekerjaan</p>
-            </div>
-            <div class="bg-white p-3 rounded-xl shadow-sm border border-slate-100 flex items-center gap-3 w-full sm:w-auto overflow-x-auto">
-                <select id="filter-penyedia-lap" class="border border-slate-200 rounded-lg px-3 py-1.5 text-xs outline-none bg-slate-50 min-w-[140px]">
-                    ${optPenyedia}
-                </select>
-                <select id="filter-status-lap" class="border border-slate-200 rounded-lg px-3 py-1.5 text-xs outline-none bg-slate-50 min-w-[120px]">
-                    <option value="">Semua Status</option>
-                    <option value="On Progress">On Progress</option>
-                    <option value="Selesai">Selesai</option>
-                    <option value="Belum Mulai">Belum Mulai</option>
-                </select>
-                <button onclick="applyLaporanFilter()" class="bg-brand text-white px-4 py-1.5 rounded-lg text-xs font-semibold hover:bg-sky-700 whitespace-nowrap">Tampilkan</button>
             </div>
         </div>
 
@@ -3364,30 +3666,82 @@ async function renderLaporan() {
     `;
     lucide.createIcons();
 
+    // Populate tahun dropdown
+    const tahunDropdown = document.getElementById('filter-tahun-lap');
+    if (tahunDropdown && window.laporanTahunOptions) {
+        let tahunHTML = '<option value="">Semua Tahun</option>';
+        window.laporanTahunOptions.forEach(thn => {
+            const selected = thn === filterTahun ? 'selected' : '';
+            tahunHTML += `<option value="${thn}" ${selected}>${thn}</option>`;
+        });
+        tahunDropdown.innerHTML = tahunHTML;
+    }
+
+    // Populate lokasi dropdown
+    const lokasiDropdown = document.getElementById('filter-lokasi-lap');
+    if (lokasiDropdown && window.laporanLokasiOptions) {
+        let lokasiHTML = '<option value="">Semua Lokasi</option>';
+        window.laporanLokasiOptions.forEach(lok => {
+            const selected = lok === filterLokasi ? 'selected' : '';
+            lokasiHTML += `<option value="${lok}" ${selected}>${lok}</option>`;
+        });
+        lokasiDropdown.innerHTML = lokasiHTML;
+    }
+
+    // Set filter values
+    if (document.getElementById('filter-penyedia-lap')) document.getElementById('filter-penyedia-lap').value = filterPenyedia;
+    if (document.getElementById('filter-status-lap')) document.getElementById('filter-status-lap').value = filterStatus;
+
     // Simpan data di window agar bisa difilter
     window._laporanData = { pekerjaan, kontrak, realisasi };
+    
+    console.log('=== DEBUG LAPORAN MONITORING ===');
+    console.log('Total Pekerjaan:', pekerjaan.length);
+    console.log('Total Kontrak:', kontrak.length);
+    console.log('Total Realisasi:', realisasi.length);
+    console.log('Sample Pekerjaan:', pekerjaan[0]);
+    console.log('Sample Kontrak:', kontrak[0]);
+    
     renderLaporanTable(pekerjaan, kontrak, realisasi);
     initLaporanChart(realisasi);
+}
+
+function applyLaporanFilter() {
+    const tahun = document.getElementById('filter-tahun-lap')?.value || '';
+    const lokasi = document.getElementById('filter-lokasi-lap')?.value || '';
+    const penyedia = document.getElementById('filter-penyedia-lap')?.value || '';
+    const status = document.getElementById('filter-status-lap')?.value || '';
+    renderLaporan({ tahun, lokasi, penyedia, status });
+}
+
+function resetLaporanFilter() {
+    renderLaporan({});
 }
 
 function renderLaporanTable(pekerjaanList, kontrakList, realisasiList) {
     const tbody = document.getElementById('laporan-tbody');
     if (!tbody) return;
 
+    const pekerjaan = pekerjaanList || [];
     const kontrak   = kontrakList   || [];
     const realisasi = realisasiList || [];
 
-    if (pekerjaanList.length === 0) {
+    if (pekerjaan.length === 0) {
         tbody.innerHTML = '<tr><td colspan="8" class="p-8 text-center text-slate-400 italic">Belum ada data pekerjaan.</td></tr>';
         return;
     }
 
     let html = '';
-    pekerjaanList.forEach((item, i) => {
-        // Join ke tabel Kontrak berdasarkan pekerjaan_id
-        const k = kontrak.find(k => String(k.pekerjaan_id) === String(item.id)) || {};
+    pekerjaan.forEach((item, i) => {
+        // Join ke tabel Kontrak berdasarkan pekerjaan_id atau nama_pekerjaan
+        const k = kontrak.find(k => 
+            String(k.pekerjaan_id) === String(item.id) || 
+            String(k.nama_pekerjaan) === String(item.nama_pekerjaan)
+        ) || {};
+        
         const nilaiKontrak = parseFloat(k.nilai_kontrak) || 0;
-        const namaPenyedia = k.nama_penyedia || k.penyedia || item.penyedia || '-';
+        const namaPenyedia = k.nama_penyedia || item.penyedia || '-';
+        const statusKontrak = k.status || '';
 
         // Hitung total realisasi keuangan dari tabel Realisasi
         const realisasiItem = realisasi.filter(r => String(r.pekerjaan_id) === String(item.id));
@@ -3399,11 +3753,12 @@ function renderLaporanTable(pekerjaanList, kontrakList, realisasiList) {
             if (p > maxProgress) maxProgress = p;
         });
 
-        // Tentukan status berdasarkan progres
-        let status = item.status || (maxProgress >= 100 ? 'Selesai' : (maxProgress > 0 ? 'On Progress' : 'Belum Mulai'));
+        // Gunakan status dari kontrak, atau hitung dari progress
+        let status = statusKontrak || (maxProgress >= 100 ? 'Selesai' : (maxProgress > 0 ? 'On Progress' : 'Belum Mulai'));
         let pColor = maxProgress >= 100 ? 'bg-emerald-500' : (maxProgress > 0 ? 'bg-blue-500' : 'bg-slate-300');
         let sColor = status === 'Selesai' ? 'text-emerald-600 bg-emerald-50' :
-                     (status === 'On Progress' ? 'text-blue-600 bg-blue-50' : 'text-amber-600 bg-amber-50');
+                     (status === 'On Progress' ? 'text-blue-600 bg-blue-50' : 
+                      (status === 'Belum Mulai' ? 'text-amber-600 bg-amber-50' : 'text-slate-600 bg-slate-50'));
 
         html += `
             <tr class="hover:bg-slate-50 transition-colors laporan-row" data-penyedia="${namaPenyedia}" data-status="${status}" data-nama="${item.nama_pekerjaan.toLowerCase()}">
@@ -3430,26 +3785,6 @@ function renderLaporanTable(pekerjaanList, kontrakList, realisasiList) {
         `;
     });
     tbody.innerHTML = html;
-}
-
-function applyLaporanFilter() {
-    const d = window._laporanData || {};
-    let list = d.pekerjaan || [];
-    const penyediaId = document.getElementById('filter-penyedia-lap')?.value || '';
-    const statusVal  = document.getElementById('filter-status-lap')?.value || '';
-    // Filter berdasarkan penyedia (dari tabel Kontrak)
-    if (penyediaId) {
-        const kontrakFiltered = (d.kontrak || []).filter(k => String(k.penyedia_id) === String(penyediaId));
-        const pidSet = new Set(kontrakFiltered.map(k => String(k.pekerjaan_id)));
-        list = list.filter(p => pidSet.has(String(p.id)));
-    }
-    renderLaporanTable(list, d.kontrak, d.realisasi);
-    // Terapkan filter status secara client-side
-    if (statusVal) {
-        document.querySelectorAll('.laporan-row').forEach(tr => {
-            tr.style.display = tr.dataset.status === statusVal ? '' : 'none';
-        });
-    }
 }
 
 function filterLaporanSearch() {
@@ -4274,8 +4609,11 @@ function showModalUser(isEdit = false) {
         document.getElementById('user-status').value = 'Aktif';
         document.getElementById('modal-user-title').innerText = 'Tambah Pengguna Baru';
         document.getElementById('btn-save-user').innerText = 'Simpan Pengguna';
-        document.getElementById('user-password').required = true;
-        document.getElementById('user-password').placeholder = 'Password wajib diisi';
+        
+        // Password WAJIB untuk user baru
+        const pwInput = document.getElementById('user-password');
+        pwInput.required = true;
+        pwInput.placeholder = 'Password wajib diisi';
     }
     const modal = document.getElementById('modal-user');
     if (!modal) return;
@@ -4319,6 +4657,16 @@ function saveUserForm(event) {
 
     const editId = document.getElementById('user-edit-id').value;
     const username = document.getElementById('user-username').value.trim();
+    const password = document.getElementById('user-password').value.trim();
+
+    // Validasi password wajib untuk user baru
+    if (!editId && !password) {
+        if (btn) {
+            btn.disabled = false;
+            btn.innerHTML = 'Simpan Pengguna';
+        }
+        return showToast('Password wajib diisi untuk pengguna baru', 'error');
+    }
 
     // Validasi duplikat username
     getUsers().then(async users => {
@@ -4344,7 +4692,7 @@ function saveUserForm(event) {
             // Update
             userData.id = editId;
             const oldUser = users.find(u => u.id === editId);
-            const newPw = document.getElementById('user-password').value;
+            const newPw = password;
             userData.password = newPw ? newPw : (oldUser ? oldUser.password : 'default123');
 
             const result = await saveUser(userData, true);
@@ -4363,8 +4711,8 @@ function saveUserForm(event) {
                 showToast('Gagal menyimpan ke Google Sheets', 'error');
             }
         } else {
-            // Create
-            userData.password = document.getElementById('user-password').value || 'default123';
+            // Create - password wajib sudah dicek di atas
+            userData.password = password;
             const result = await saveUser(userData, false);
             if (result) {
                 showToast('Pengguna baru berhasil ditambahkan');
@@ -4882,46 +5230,62 @@ async function renderRekap() {
         rabByPekerjaan[pid].push(r);
     });
 
-    // Bangun data per pekerjaan dengan total JTM & JTR
+    // Bangun data per pekerjaan dengan total berdasarkan jenis_tegangan pekerjaan
     const pekerjaanWithRAB = allPekerjaan.map(p => {
         const rabItems = rabByPekerjaan[String(p.id)] || [];
-        const jtmItems = rabItems.filter(item => {
-            const kat = (item.kategori || '').toLowerCase();
-            return kat.includes('jtm') || kat.includes('tegangan menengah');
-        });
-        const jtrItems = rabItems.filter(item => {
-            const kat = (item.kategori || '').toLowerCase();
-            return kat.includes('jtr') || kat.includes('tegangan rendah');
-        });
-        const calcTotal = (items) => items.reduce((t, i) => {
-            const v = parseFloat(i.volume) || 0;
-            const m = parseFloat(i.harga_material) || 0;
-            const j = parseFloat(i.harga_jasa) || 0;
-            return t + v * (m + j);
-        }, 0);
+        
+        // Hitung total material dan jasa
+        const calcTotals = (items) => {
+            return items.reduce((acc, i) => {
+                const v = parseFloat(i.volume) || 0;
+                const m = parseFloat(i.harga_material) || 0;
+                const j = parseFloat(i.harga_jasa) || 0;
+                return {
+                    totalMaterial: acc.totalMaterial + (v * m),
+                    totalJasa: acc.totalJasa + (v * j),
+                    totalAll: acc.totalAll + (v * (m + j))
+                };
+            }, { totalMaterial: 0, totalJasa: 0, totalAll: 0 });
+        };
+        
+        const totals = calcTotals(rabItems);
+        const isJTM = (p.jenis_tegangan || '').toUpperCase() === 'JTM';
+        const isJTR = (p.jenis_tegangan || '').toUpperCase() === 'JTR';
+        
         return {
             ...p,
             rabItems,
-            jtmItems,
-            jtrItems,
-            totalJTM: calcTotal(jtmItems),
-            totalJTR: calcTotal(jtrItems),
-            totalRAB: calcTotal(rabItems),
-            hasJTM: jtmItems.length > 0,
-            hasJTR: jtrItems.length > 0
+            totalMaterial: totals.totalMaterial,
+            totalJasa: totals.totalJasa,
+            totalRAB: totals.totalAll,
+            isJTM: isJTM,
+            isJTR: isJTR
         };
     }).filter(p => p.rabItems.length > 0); // Hanya tampilkan yang ada RAB-nya
 
     // Hitung grand totals
     let grandTotalJTM = 0, grandTotalJTR = 0, grandTotalAll = 0;
+    let grandMaterialJTM = 0, grandJasaJTM = 0, grandMaterialJTR = 0, grandJasaJTR = 0;
+    let grandMaterialAll = 0, grandJasaAll = 0;
+    
     pekerjaanWithRAB.forEach(p => {
-        grandTotalJTM += p.totalJTM;
-        grandTotalJTR += p.totalJTR;
         grandTotalAll += p.totalRAB;
+        grandMaterialAll += p.totalMaterial;
+        grandJasaAll += p.totalJasa;
+        
+        if (p.isJTM) {
+            grandTotalJTM += p.totalRAB;
+            grandMaterialJTM += p.totalMaterial;
+            grandJasaJTM += p.totalJasa;
+        } else if (p.isJTR) {
+            grandTotalJTR += p.totalRAB;
+            grandMaterialJTR += p.totalMaterial;
+            grandJasaJTR += p.totalJasa;
+        }
     });
 
-    const countJTM = pekerjaanWithRAB.filter(p => p.hasJTM).length;
-    const countJTR = pekerjaanWithRAB.filter(p => p.hasJTR).length;
+    const countJTM = pekerjaanWithRAB.filter(p => p.isJTM).length;
+    const countJTR = pekerjaanWithRAB.filter(p => p.isJTR).length;
 
     const fmtCur = (v) => CONFIG.formatCurrency(v);
 
@@ -4955,7 +5319,7 @@ async function renderRekap() {
                         <div>
                             <p class="text-xs text-slate-500 font-medium">Total JTM</p>
                             <p class="text-lg font-bold text-purple-700">${fmtCur(grandTotalJTM)}</p>
-                            <p class="text-[10px] text-slate-400">${countJTM} pekerjaan</p>
+                            <p class="text-[10px] text-slate-400">${countJTM} pekerjaan • Mat: ${fmtCur(grandMaterialJTM)} • Jasa: ${fmtCur(grandJasaJTM)}</p>
                         </div>
                     </div>
                 </div>
@@ -4965,7 +5329,7 @@ async function renderRekap() {
                         <div>
                             <p class="text-xs text-slate-500 font-medium">Total JTR</p>
                             <p class="text-lg font-bold text-orange-700">${fmtCur(grandTotalJTR)}</p>
-                            <p class="text-[10px] text-slate-400">${countJTR} pekerjaan</p>
+                            <p class="text-[10px] text-slate-400">${countJTR} pekerjaan • Mat: ${fmtCur(grandMaterialJTR)} • Jasa: ${fmtCur(grandJasaJTR)}</p>
                         </div>
                     </div>
                 </div>
@@ -4975,6 +5339,7 @@ async function renderRekap() {
                         <div>
                             <p class="text-xs text-slate-500 font-medium">Grand Total RAB</p>
                             <p class="text-lg font-bold text-emerald-700">${fmtCur(grandTotalAll)}</p>
+                            <p class="text-[10px] text-slate-400">Mat: ${fmtCur(grandMaterialAll)} • Jasa: ${fmtCur(grandJasaAll)}</p>
                         </div>
                     </div>
                 </div>
@@ -5022,8 +5387,8 @@ async function renderRekap() {
 
                 <!-- Tab Content: JTM -->
                 <div id="tab-content-jtm" class="rekap-tab-content p-4 space-y-4 hidden">
-                    ${countJTM === 0 ? '<div class="text-center py-12 text-slate-400 italic">Tidak ada pekerjaan dengan item JTM</div>' :
-                    pekerjaanWithRAB.filter(p => p.hasJTM).map((p, idx) => buildRekapPekerjaanCard(p, idx, 'jtm')).join('')}
+                    ${countJTM === 0 ? '<div class="text-center py-12 text-slate-400 italic">Tidak ada pekerjaan dengan jenis tegangan JTM</div>' :
+                    pekerjaanWithRAB.filter(p => p.isJTM).map((p, idx) => buildRekapPekerjaanCard(p, idx, 'jtm')).join('')}
                     
                     ${countJTM > 0 ? `
                     <div class="bg-gradient-to-r from-purple-700 to-purple-600 rounded-xl p-6 text-white mt-6">
@@ -5031,6 +5396,10 @@ async function renderRekap() {
                             <div class="md:col-span-2">
                                 <h4 class="text-lg font-bold flex items-center gap-2"><i data-lucide="zap" class="w-5 h-5"></i> TOTAL SEMUA JTM</h4>
                                 <p class="text-purple-200 text-xs mt-1">Terbilang: <em>${numberToWords(Math.round(grandTotalJTM))} Rupiah</em></p>
+                                <div class="flex gap-4 mt-2 text-xs">
+                                    <span>Material: ${fmtCur(grandMaterialJTM)}</span>
+                                    <span>Jasa: ${fmtCur(grandJasaJTM)}</span>
+                                </div>
                             </div>
                             <div class="text-right">
                                 <p class="text-xs text-purple-200">${countJTM} Pekerjaan</p>
@@ -5043,8 +5412,8 @@ async function renderRekap() {
 
                 <!-- Tab Content: JTR -->
                 <div id="tab-content-jtr" class="rekap-tab-content p-4 space-y-4 hidden">
-                    ${countJTR === 0 ? '<div class="text-center py-12 text-slate-400 italic">Tidak ada pekerjaan dengan item JTR</div>' :
-                    pekerjaanWithRAB.filter(p => p.hasJTR).map((p, idx) => buildRekapPekerjaanCard(p, idx, 'jtr')).join('')}
+                    ${countJTR === 0 ? '<div class="text-center py-12 text-slate-400 italic">Tidak ada pekerjaan dengan jenis tegangan JTR</div>' :
+                    pekerjaanWithRAB.filter(p => p.isJTR).map((p, idx) => buildRekapPekerjaanCard(p, idx, 'jtr')).join('')}
                     
                     ${countJTR > 0 ? `
                     <div class="bg-gradient-to-r from-orange-600 to-orange-500 rounded-xl p-6 text-white mt-6">
@@ -5052,6 +5421,10 @@ async function renderRekap() {
                             <div class="md:col-span-2">
                                 <h4 class="text-lg font-bold flex items-center gap-2"><i data-lucide="home" class="w-5 h-5"></i> TOTAL SEMUA JTR</h4>
                                 <p class="text-orange-200 text-xs mt-1">Terbilang: <em>${numberToWords(Math.round(grandTotalJTR))} Rupiah</em></p>
+                                <div class="flex gap-4 mt-2 text-xs">
+                                    <span>Material: ${fmtCur(grandMaterialJTR)}</span>
+                                    <span>Jasa: ${fmtCur(grandJasaJTR)}</span>
+                                </div>
                             </div>
                             <div class="text-right">
                                 <p class="text-xs text-orange-200">${countJTR} Pekerjaan</p>
@@ -5074,19 +5447,18 @@ function buildRekapPekerjaanCard(p, idx, tabType) {
     const cardId = `rekap-card-${tabType}-${idx}`;
     const tableId = `rekap-table-${tabType}-${idx}`;
     
-    // Pilih items berdasarkan tab
-    let items, totalValue, colorScheme;
+    // Pilih items dan data berdasarkan tab
+    let items = p.rabItems;
+    let totalValue = p.totalRAB;
+    let totalMaterial = p.totalMaterial;
+    let totalJasa = p.totalJasa;
+    
+    let colorScheme;
     if (tabType === 'jtm') {
-        items = p.jtmItems;
-        totalValue = p.totalJTM;
         colorScheme = { bg: 'bg-purple-50', border: 'border-purple-200', text: 'text-purple-700', badge: 'bg-purple-100 text-purple-700', header: 'bg-purple-600' };
     } else if (tabType === 'jtr') {
-        items = p.jtrItems;
-        totalValue = p.totalJTR;
         colorScheme = { bg: 'bg-orange-50', border: 'border-orange-200', text: 'text-orange-700', badge: 'bg-orange-100 text-orange-700', header: 'bg-orange-600' };
     } else {
-        items = p.rabItems;
-        totalValue = p.totalRAB;
         colorScheme = { bg: 'bg-blue-50', border: 'border-blue-200', text: 'text-blue-700', badge: 'bg-blue-100 text-blue-700', header: 'bg-blue-600' };
     }
 
@@ -5095,48 +5467,55 @@ function buildRekapPekerjaanCard(p, idx, tabType) {
     // Build rows
     let rowsHtml = '';
     let runningTotal = 0;
+    let runningMaterial = 0;
+    let runningJasa = 0;
+    
     items.forEach((item, i) => {
         const volume = parseFloat(item.volume) || 0;
         const hargaMaterial = parseFloat(item.harga_material) || 0;
         const hargaJasa = parseFloat(item.harga_jasa) || 0;
-        const totalHarga = volume * (hargaMaterial + hargaJasa);
+        const totalMat = volume * hargaMaterial;
+        const totalJas = volume * hargaJasa;
+        const totalHarga = totalMat + totalJas;
+        
         runningTotal += totalHarga;
-        const katBadge = (item.kategori || '').toUpperCase() === 'JTM' 
-            ? 'bg-purple-100 text-purple-700' 
-            : ((item.kategori || '').toUpperCase() === 'JTR' ? 'bg-orange-100 text-orange-700' : 'bg-slate-100 text-slate-600');
+        runningMaterial += totalMat;
+        runningJasa += totalJas;
 
         rowsHtml += `
             <tr class="hover:bg-slate-50 transition-colors">
                 <td class="p-2.5 text-center text-slate-500 border-r border-slate-100 text-xs">${i + 1}</td>
-                ${tabType === 'semua' ? `<td class="p-2.5 text-center border-r border-slate-100"><span class="px-1.5 py-0.5 rounded text-[10px] font-bold ${katBadge}">${item.kategori || '-'}</span></td>` : ''}
                 <td class="p-2.5 border-r border-slate-100 text-xs">
                     <div class="font-medium text-slate-800">${item.uraian || '-'}</div>
+                    ${item.kategori ? `<div class="text-[9px] text-slate-400 mt-0.5">${item.kategori}</div>` : ''}
                 </td>
                 <td class="p-2.5 text-center border-r border-slate-100 text-xs font-medium">${volume}</td>
                 <td class="p-2.5 text-center border-r border-slate-100 text-xs text-slate-600">${item.satuan || '-'}</td>
                 <td class="p-2.5 text-right border-r border-slate-100 text-xs font-mono">${fmtCur(hargaMaterial)}</td>
                 <td class="p-2.5 text-right border-r border-slate-100 text-xs font-mono">${fmtCur(hargaJasa)}</td>
+                <td class="p-2.5 text-right border-r border-slate-100 text-xs font-mono text-blue-700">${fmtCur(totalMat)}</td>
+                <td class="p-2.5 text-right border-r border-slate-100 text-xs font-mono text-green-700">${fmtCur(totalJas)}</td>
                 <td class="p-2.5 text-right font-bold text-slate-900 text-xs font-mono">${fmtCur(totalHarga)}</td>
             </tr>
         `;
     });
 
-    // Jumlah row
-    const colSpan = tabType === 'semua' ? 7 : 6;
+    // Jumlah row dengan breakdown material & jasa
     rowsHtml += `
         <tr class="bg-slate-100 font-bold border-t-2 border-slate-300">
-            <td class="p-2.5 text-center border-r border-slate-200 text-xs" colspan="${colSpan}">SUB TOTAL</td>
+            <td class="p-2.5 text-center border-r border-slate-200 text-xs" colspan="6">SUB TOTAL</td>
+            <td class="p-2.5 text-right text-blue-700 font-mono text-xs border-r border-slate-200">${fmtCur(runningMaterial)}</td>
+            <td class="p-2.5 text-right text-green-700 font-mono text-xs border-r border-slate-200">${fmtCur(runningJasa)}</td>
             <td class="p-2.5 text-right text-slate-900 font-mono text-xs">${fmtCur(runningTotal)}</td>
         </tr>
     `;
 
-    // Kategori header untuk tab Semua
-    const kategoriInfo = tabType === 'semua' ? `
-        <div class="flex gap-2 ml-auto">
-            ${p.hasJTM ? `<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-purple-100 text-purple-700">JTM: ${fmtCur(p.totalJTM)}</span>` : ''}
-            ${p.hasJTR ? `<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-orange-100 text-orange-700">JTR: ${fmtCur(p.totalJTR)}</span>` : ''}
-        </div>
-    ` : '';
+    // Badge jenis tegangan
+    const teganganBadge = p.isJTM 
+        ? '<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-purple-100 text-purple-700">JTM</span>'
+        : (p.isJTR 
+            ? '<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-orange-100 text-orange-700">JTR</span>'
+            : '<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-700">Umum</span>');
 
     return `
         <div id="${cardId}" class="border ${colorScheme.border} rounded-xl overflow-hidden shadow-sm hover:shadow-md transition-shadow">
@@ -5144,19 +5523,25 @@ function buildRekapPekerjaanCard(p, idx, tabType) {
             <button onclick="toggleRekapCard('${tableId}')" class="w-full flex items-center gap-3 p-4 ${colorScheme.bg} hover:brightness-95 transition text-left">
                 <div class="w-8 h-8 rounded-lg ${colorScheme.header} text-white flex items-center justify-center font-bold text-sm flex-shrink-0">${idx + 1}</div>
                 <div class="flex-1 min-w-0">
-                    <h4 class="text-sm font-bold text-slate-800 truncate">${p.nama_pekerjaan || '-'}</h4>
-                    <div class="flex flex-wrap gap-x-4 gap-y-1 mt-1 text-[11px] text-slate-500">
+                    <div class="flex items-center gap-2 mb-1">
+                        <h4 class="text-sm font-bold text-slate-800 truncate">${p.nama_pekerjaan || '-'}</h4>
+                        ${tabType === 'semua' ? teganganBadge : ''}
+                    </div>
+                    <div class="flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-slate-500">
                         <span><b>No. Paket:</b> ${p.nomor_paket || '-'}</span>
                         <span><b>Lokasi:</b> ${p.lokasi || '-'}</span>
                         <span><b>Jenis:</b> ${p.jenis_kegiatan || '-'}</span>
                         <span><b>Item RAB:</b> ${items.length}</span>
                     </div>
                 </div>
-                ${kategoriInfo}
-                <div class="flex items-center gap-2 flex-shrink-0">
+                <div class="flex flex-col items-end gap-1 flex-shrink-0">
                     <span class="text-sm font-bold ${colorScheme.text}">${fmtCur(totalValue)}</span>
-                    <i data-lucide="chevron-down" class="w-4 h-4 text-slate-400 transition-transform rekap-chevron" id="chevron-${tableId}"></i>
+                    <div class="flex gap-2 text-[9px] text-slate-500">
+                        <span>Mat: ${fmtCur(totalMaterial)}</span>
+                        <span>Jasa: ${fmtCur(totalJasa)}</span>
+                    </div>
                 </div>
+                <i data-lucide="chevron-down" class="w-4 h-4 text-slate-400 transition-transform rekap-chevron flex-shrink-0" id="chevron-${tableId}"></i>
             </button>
             <!-- Detail Table (hidden by default) -->
             <div id="${tableId}" class="hidden">
@@ -5165,13 +5550,14 @@ function buildRekapPekerjaanCard(p, idx, tabType) {
                         <thead class="bg-slate-100">
                             <tr>
                                 <th class="p-2.5 w-10 text-center border-r border-slate-200 text-xs font-semibold">NO</th>
-                                ${tabType === 'semua' ? '<th class="p-2.5 w-20 text-center border-r border-slate-200 text-xs font-semibold">KAT</th>' : ''}
                                 <th class="p-2.5 border-r border-slate-200 text-xs font-semibold">URAIAN</th>
                                 <th class="p-2.5 w-14 text-center border-r border-slate-200 text-xs font-semibold">VOL</th>
                                 <th class="p-2.5 w-14 text-center border-r border-slate-200 text-xs font-semibold">SAT</th>
-                                <th class="p-2.5 w-24 text-right border-r border-slate-200 text-xs font-semibold">H. MATERIAL</th>
+                                <th class="p-2.5 w-24 text-right border-r border-slate-200 text-xs font-semibold">H. MAT</th>
                                 <th class="p-2.5 w-24 text-right border-r border-slate-200 text-xs font-semibold">H. JASA</th>
-                                <th class="p-2.5 w-28 text-right text-xs font-semibold">TOTAL (Rp)</th>
+                                <th class="p-2.5 w-24 text-right border-r border-slate-200 text-xs font-semibold bg-blue-50 text-blue-700">TOTAL MAT</th>
+                                <th class="p-2.5 w-24 text-right border-r border-slate-200 text-xs font-semibold bg-green-50 text-green-700">TOTAL JASA</th>
+                                <th class="p-2.5 w-28 text-right text-xs font-semibold">JUMLAH (Rp)</th>
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-slate-100">
