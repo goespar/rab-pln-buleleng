@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="id">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RAB & Monitoring Pekerjaan PLN</title>
+
+    <!-- Tailwind CSS (CDN) -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#0ea5e9', // Light Blue
+                        brand: '#0369a1', // Darker corporate blue
+                        sidebar: '#0f172a' // Dark slate for sidebar
+                    }
+                }
+            }
+        }
+    </script>
+
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="style.css">
+
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+
+<body class="text-slate-800 antialiased bg-slate-50 overflow-x-hidden">
+
+    <!-- Mobile Sidebar Overlay -->
+    <div id="sidebar-overlay" class="fixed inset-0 bg-slate-900/50 z-20 hidden md:hidden transition-opacity"
+        onclick="toggleSidebar()"></div>
+
+    <!-- Sidebar -->
+    <aside id="sidebar"
+        class="sidebar-transition fixed inset-y-0 left-0 w-64 bg-sidebar text-slate-300 z-30 transform -translate-x-full md:translate-x-0 flex flex-col h-screen">
+        <!-- Logo/Brand -->
+        <div class="flex items-center justify-center h-16 bg-slate-900 border-b border-slate-800 px-4">
+            <div class="flex items-center gap-3 w-full">
+                <div class="bg-brand text-white p-1.5 rounded-lg">
+                    <i data-lucide="zap" class="w-6 h-6"></i>
+                </div>
+                <div>
+                    <h1 class="text-white font-bold text-sm tracking-wide">MONITORING</h1>
+                    <p class="text-xs text-slate-400">RAB & Realisasi</p>
+                </div>
+            </div>
+            <button class="md:hidden text-slate-400 hover:text-white" onclick="toggleSidebar()">
+                <i data-lucide="x" class="w-5 h-5"></i>
+            </button>
+        </div>
+
+        <!-- Navigation -->
+        <nav class="flex-1 overflow-y-auto sidebar-scroll py-4 px-3 space-y-1">
+            <a href="#" onclick="navigate('dashboard')"
+                class="nav-link active flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium hover:bg-slate-800 hover:text-white transition-colors"
+                data-page="dashboard">
+                <i data-lucide="layout-dashboard" class="w-5 h-5 text-slate-400"></i> Dashboard
+            </a>
+            <a href="#" onclick="navigate('rab')"
+                class="nav-link flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium hover:bg-slate-800 hover:text-white transition-colors"
+                data-page="rab">
+                <i data-lucide="calculator" class="w-5 h-5 text-slate-400"></i> RAB
+            </a>
+            <a href="#" onclick="navigate('rekap')"
+                class="nav-link flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium hover:bg-slate-800 hover:text-white transition-colors"
+                data-page="rekap">
+                <i data-lucide="file-text" class="w-5 h-5 text-slate-400"></i> Rekap RAB
+            </a>
+            <a href="#" onclick="navigate('realisasi')"
+                class="nav-link flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium hover:bg-slate-800 hover:text-white transition-colors"
+                data-page="realisasi">
+                <i data-lucide="trending-up" class="w-5 h-5 text-slate-400"></i> Realisasi
+            </a>
+
+            <div class="pt-4 pb-2">
+                <p class="px-3 text-xs font-semibold text-slate-500 uppercase tracking-wider">Master Data</p>
+            </div>
+
+            <a href="#" onclick="navigate('pengadaan')"
+                class="nav-link flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium hover:bg-slate-800 hover:text-white transition-colors"
+                data-page="pengadaan">
+                <i data-lucide="shopping-cart" class="w-5 h-5 text-slate-400"></i> Pengadaan
+            </a>
+            <a href="#" onclick="navigate('pekerjaan')"
+                class="nav-link flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium hover:bg-slate-800 hover:text-white transition-colors"
+                data-page="pekerjaan">
+                <i data-lucide="briefcase" class="w-5 h-5 text-slate-400"></i> Pekerjaan
+            </a>
+            <a href="#" onclick="navigate('kontrak')"
+                class="nav-link flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium hover:bg-slate-800 hover:text-white transition-colors"
+                data-page="kontrak">
+                <i data-lucide="file-signature" class="w-5 h-5 text-slate-400"></i> Kontrak
+            </a>
+            <a href="#" onclick="navigate('penyedia')"
+                class="nav-link flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium hover:bg-slate-800 hover:text-white transition-colors"
+                data-page="penyedia">
+                <i data-lucide="building" class="w-5 h-5 text-slate-400"></i> Penyedia
+            </a>
+            <a href="#" onclick="navigate('material')"
+                class="nav-link flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium hover:bg-slate-800 hover:text-white transition-colors"
+                data-page="material">
+                <i data-lucide="package" class="w-5 h-5 text-slate-400"></i> Material
+            </a>
+
+            <div class="pt-4 pb-2">
+                <p class="px-3 text-xs font-semibold text-slate-500 uppercase tracking-wider">Sistem</p>
+            </div>
+
+            <a href="#" onclick="navigate('laporan')"
+                class="nav-link flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium hover:bg-slate-800 hover:text-white transition-colors"
+                data-page="laporan">
+                <i data-lucide="file-bar-chart-2" class="w-5 h-5 text-slate-400"></i> Laporan
+            </a>
+            <a href="#" onclick="navigate('log')"
+                class="nav-link flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium hover:bg-slate-800 hover:text-white transition-colors"
+                data-page="log">
+                <i data-lucide="history" class="w-5 h-5 text-slate-400"></i> Log Aktivitas
+            </a>
+            <a href="#" onclick="navigate('user')"
+                class="nav-link flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium hover:bg-slate-800 hover:text-white transition-colors"
+                data-page="user">
+                <i data-lucide="users" class="w-5 h-5 text-slate-400"></i> Pengguna (User)
+            </a>
+            <a href="#" onclick="navigate('pengaturan')"
+                class="nav-link flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium hover:bg-slate-800 hover:text-white transition-colors"
+                data-page="pengaturan">
+                <i data-lucide="settings" class="w-5 h-5 text-slate-400"></i> Pengaturan
+            </a>
+        </nav>
+
+        <!-- User info mini -->
+        <div class="p-4 border-t border-slate-800 bg-slate-900/50">
+            <div class="flex items-center gap-3">
+                <div
+                    class="w-8 h-8 rounded-full bg-brand flex items-center justify-center text-white font-semibold text-sm sidebar-user-avatar">
+                    A
+                </div>
+                <div>
+                    <p class="text-sm font-medium text-white sidebar-user-name">Admin Utama</p>
+                    <p class="text-xs text-slate-500 sidebar-user-role">Perencanaan</p>
+                </div>
+                <button onclick="doLogout()" title="Keluar" class="ml-auto text-slate-500 hover:text-red-400 transition-colors">
+                    <i data-lucide="log-out" class="w-4 h-4"></i>
+                </button>
+            </div>
+        </div>
+    </aside>
+
+    <!-- Main Content Wrapper -->
+    <div class="md:ml-64 min-h-screen flex flex-col transition-all duration-300">
+
+        <!-- Top Header -->
+        <header
+            class="h-16 bg-white border-b border-slate-200 flex items-center justify-between px-4 sm:px-6 z-10 sticky top-0 shadow-sm">
+            <div class="flex items-center gap-4">
+                <button class="md:hidden text-slate-500 hover:text-slate-700" onclick="toggleSidebar()">
+                    <i data-lucide="menu" class="w-6 h-6"></i>
+                </button>
+                <h2 id="page-title" class="text-lg font-semibold text-slate-800 hidden sm:block">Dashboard</h2>
+            </div>
+
+            <div class="flex items-center gap-4">
+                <div class="relative">
+                    <button class="text-slate-400 hover:text-brand transition-colors relative">
+                        <i data-lucide="bell" class="w-5 h-5"></i>
+                        <span class="absolute top-0 right-0 w-2 h-2 bg-red-500 rounded-full"></span>
+                    </button>
+                </div>
+                <div class="h-8 w-px bg-slate-200"></div>
+                <div class="flex items-center gap-2 cursor-pointer" onclick="navigate('pengaturan')">
+                    <span class="text-sm font-medium text-slate-700 hidden sm:block header-user-greet">Halo, Admin!</span>
+                    <i data-lucide="chevron-down" class="w-4 h-4 text-slate-400"></i>
+                </div>
+            </div>
+        </header>
+
+        <!-- Dynamic Content Area -->
+        <main id="app-content" class="flex-1 p-4 sm:p-6 lg:p-8">
+            <div class="flex items-center justify-center h-64">
+                <div class="flex flex-col items-center gap-3">
+                    <div class="loader"></div>
+                    <p class="text-sm text-slate-500">Memuat aplikasi...</p>
+                </div>
+            </div>
+        </main>
+
+    </div>
+
+    <!-- Toast Notification Container -->
+    <div id="toast-container" class="fixed bottom-4 right-4 z-50 flex flex-col gap-2"></div>
+
+    <script src="config.js"></script>
+    <script>
+        lucide.createIcons();
+        function toggleSidebar() {
+            const sidebar = document.getElementById('sidebar');
+            const overlay = document.getElementById('sidebar-overlay');
+            sidebar.classList.toggle('-translate-x-full');
+            if (overlay.classList.contains('hidden')) {
+                overlay.classList.remove('hidden');
+                setTimeout(() => overlay.classList.add('opacity-100'), 10);
+            } else {
+                overlay.classList.remove('opacity-100');
+                setTimeout(() => overlay.classList.add('hidden'), 300);
+            }
+        }
+    </script>
+    <script src="app.js?v=2.2"></script>
+</body>
+
+</html>

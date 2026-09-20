@@ -1,0 +1,124 @@
+// =================================================================
+// BACKEND API UNTUK SISTEM MONITORING RAB & REALISASI PLN
+// =================================================================
+
+function doGet(e) {
+  try {
+    var action = e.parameter.action;
+    var table = e.parameter.table;
+    
+    if (action === 'list' && table) {
+      return createJsonResponse({ success: true, data: getTableData(table) });
+    } else if (action === 'dashboard') {
+      return createJsonResponse({ success: true, data: {} });
+    }
+    return createJsonResponse({ success: false, message: 'Action tidak valid.' });
+  } catch (error) {
+    return createJsonResponse({ success: false, message: error.toString() });
+  }
+}
+
+function doPost(e) {
+  try {
+    var payload = JSON.parse(e.postData.contents);
+    var action = payload.action;
+    var table = payload.table;
+    var rowData = payload.data || {};
+    
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var sheet = ss.getSheetByName(table);
+    if (!sheet) throw new Error("Sheet '" + table + "' tidak ditemukan.");
+
+    // ACTION: CREATE (SIMPAN DATA BARU)
+    if (action === 'create') {
+      var headers = getHeaders(sheet);
+      var newRow = [];
+      var newId = "ID_" + new Date().getTime() + Math.floor(Math.random() * 1000);
+      
+      for (var i = 0; i < headers.length; i++) {
+        var headerName = headers[i].toLowerCase().trim();
+        if (headerName === 'id') newRow.push(newId);
+        else if (headerName === 'created_at' || headerName === 'timestamp') newRow.push(new Date());
+        else newRow.push(rowData[headerName] !== undefined ? rowData[headerName] : '');
+      }
+      sheet.appendRow(newRow);
+      return createJsonResponse({ success: true, message: 'Disimpan.', id: newId });
+    }
+    
+    // ACTION: UPDATE (EDIT DATA)
+    else if (action === 'update') {
+      var idToUpdate = rowData.id;
+      if (!idToUpdate) throw new Error("ID tidak diberikan untuk update.");
+      var data = sheet.getDataRange().getValues();
+      var headers = data[0];
+      var idIndex = headers.findIndex(h => h.toLowerCase().trim() === 'id');
+      if (idIndex === -1) throw new Error("Kolom 'id' tidak ditemukan.");
+
+      var updated = false;
+      for (var r = 1; r < data.length; r++) {
+        if (String(data[r][idIndex]) === String(idToUpdate)) {
+          for (var c = 0; c < headers.length; c++) {
+            var headerName = headers[c].toLowerCase().trim();
+            if (headerName !== 'id' && headerName !== 'created_at' && rowData[headerName] !== undefined) {
+              sheet.getRange(r + 1, c + 1).setValue(rowData[headerName]);
+            }
+          }
+          updated = true;
+          break;
+        }
+      }
+      if (updated) return createJsonResponse({ success: true, message: 'Data diupdate.' });
+      else throw new Error("Data ID tidak ditemukan.");
+    }
+    
+    // ACTION: DELETE (HAPUS DATA)
+    else if (action === 'delete') {
+      var idToDelete = payload.id;
+      var data = sheet.getDataRange().getValues();
+      var headers = data[0];
+      var idIndex = headers.findIndex(h => h.toLowerCase().trim() === 'id');
+      
+      var deleted = false;
+      for (var r = data.length - 1; r > 0; r--) {
+        if (String(data[r][idIndex]) === String(idToDelete)) {
+          sheet.deleteRow(r + 1);
+          deleted = true;
+          break;
+        }
+      }
+      if (deleted) return createJsonResponse({ success: true, message: 'Data dihapus.' });
+      else throw new Error("Data ID tidak ditemukan.");
+    }
+    
+    throw new Error("Action POST tidak dikenali.");
+  } catch (error) {
+    return createJsonResponse({ success: false, message: error.toString() });
+  }
+}
+
+function doOptions(e) { return createJsonResponse({ success: true }); }
+
+function getHeaders(sheet) {
+  var lastCol = sheet.getLastColumn();
+  return lastCol === 0 ? [] : sheet.getRange(1, 1, 1, lastCol).getValues()[0];
+}
+
+function getTableData(tableName) {
+  var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(tableName);
+  if (!sheet || sheet.getLastRow() <= 1) return [];
+  var data = sheet.getDataRange().getValues();
+  var headers = data[0], result = [];
+  for (var r = 1; r < data.length; r++) {
+    var obj = {}, rowEmpty = true;
+    for (var c = 0; c < headers.length; c++) {
+      var headerName = headers[c].toLowerCase().trim();
+      if (headerName) { obj[headerName] = data[r][c]; if (data[r][c] !== '') rowEmpty = false; }
+    }
+    if (!rowEmpty) result.push(obj);
+  }
+  return result;
+}
+
+function createJsonResponse(responseObject) {
+  return ContentService.createTextOutput(JSON.stringify(responseObject)).setMimeType(ContentService.MimeType.JSON);
+}
