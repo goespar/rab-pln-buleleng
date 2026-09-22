@@ -67,15 +67,34 @@
                 data-page="dashboard">
                 <i data-lucide="layout-dashboard" class="w-5 h-5 text-slate-400"></i> Dashboard
             </a>
+
+            <!-- PRK Section -->
+            <div class="pt-2 pb-1">
+                <p class="px-3 text-[10px] font-bold text-slate-500 uppercase tracking-widest">Program Rencana Kerja</p>
+            </div>
+            <a href="#" onclick="navigate('prk')"
+                class="nav-link flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium hover:bg-slate-800 hover:text-white transition-colors"
+                data-page="prk">
+                <i data-lucide="folder-open" class="w-5 h-5 text-slate-400"></i> PRK
+            </a>
+            <!-- RAB & Monitoring Section -->
+            <div class="pt-2 pb-1">
+                <p class="px-3 text-[10px] font-bold text-slate-500 uppercase tracking-widest">RAB & Monitoring</p>
+            </div>
             <a href="#" onclick="navigate('rab')"
                 class="nav-link flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium hover:bg-slate-800 hover:text-white transition-colors"
                 data-page="rab">
-                <i data-lucide="calculator" class="w-5 h-5 text-slate-400"></i> RAB
+                <i data-lucide="calculator" class="w-5 h-5 text-slate-400"></i> INPUT RAB
             </a>
             <a href="#" onclick="navigate('rekap')"
                 class="nav-link flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium hover:bg-slate-800 hover:text-white transition-colors"
                 data-page="rekap">
-                <i data-lucide="file-text" class="w-5 h-5 text-slate-400"></i> Rekap RAB
+                <i data-lucide="file-text" class="w-5 h-5 text-slate-400"></i> REKAP RAB KOMPONEN
+            </a>
+            <a href="#" onclick="navigate('rekaprabpengadaan')"
+                class="nav-link flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium hover:bg-slate-800 hover:text-white transition-colors"
+                data-page="rekaprabpengadaan">
+                <i data-lucide="file-text" class="w-5 h-5 text-slate-400"></i> REKAP RAB PENGADAAN
             </a>
             <a href="#" onclick="navigate('realisasi')"
                 class="nav-link flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium hover:bg-slate-800 hover:text-white transition-colors"
@@ -83,19 +102,15 @@
                 <i data-lucide="trending-up" class="w-5 h-5 text-slate-400"></i> Realisasi
             </a>
 
-            <div class="pt-4 pb-2">
-                <p class="px-3 text-xs font-semibold text-slate-500 uppercase tracking-wider">Master Data</p>
+            <!-- Master Data Section -->
+            <div class="pt-4 pb-1">
+                <p class="px-3 text-[10px] font-bold text-slate-500 uppercase tracking-widest">Master Data</p>
             </div>
 
-            <a href="#" onclick="navigate('pengadaan')"
+            <a href="#" onclick="navigate('material')"
                 class="nav-link flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium hover:bg-slate-800 hover:text-white transition-colors"
-                data-page="pengadaan">
-                <i data-lucide="shopping-cart" class="w-5 h-5 text-slate-400"></i> Pengadaan
-            </a>
-            <a href="#" onclick="navigate('pekerjaan')"
-                class="nav-link flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium hover:bg-slate-800 hover:text-white transition-colors"
-                data-page="pekerjaan">
-                <i data-lucide="briefcase" class="w-5 h-5 text-slate-400"></i> Pekerjaan
+                data-page="material">
+                <i data-lucide="package" class="w-5 h-5 text-slate-400"></i> Material
             </a>
             <a href="#" onclick="navigate('kontrak')"
                 class="nav-link flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium hover:bg-slate-800 hover:text-white transition-colors"
@@ -106,11 +121,6 @@
                 class="nav-link flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium hover:bg-slate-800 hover:text-white transition-colors"
                 data-page="penyedia">
                 <i data-lucide="building" class="w-5 h-5 text-slate-400"></i> Penyedia
-            </a>
-            <a href="#" onclick="navigate('material')"
-                class="nav-link flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium hover:bg-slate-800 hover:text-white transition-colors"
-                data-page="material">
-                <i data-lucide="package" class="w-5 h-5 text-slate-400"></i> Material
             </a>
 
             <div class="pt-4 pb-2">
@@ -216,7 +226,38 @@
             }
         }
     </script>
-    <script src="app.js?v=2.2"></script>
+    <!-- =============================================
+         MODULAR JS — urutan WAJIB dipertahankan
+         ============================================= -->
+
+    <!-- 1. CORE: fondasi yang dipakai semua modul -->
+    <script src="js/core/utils.js"></script>
+    <script src="js/core/api.js"></script>
+    <script src="js/core/ui.js"></script>
+    <script src="js/core/auth.js"></script>
+
+    <!-- 2. MODULES: setiap fitur di file terpisah -->
+    <script src="js/modules/catatan.js"></script>
+    <script src="js/modules/dashboard.js"></script>
+    <script src="js/modules/prk.js"></script>
+    <script src="js/modules/program.js"></script>
+    <script src="js/modules/pengadaan.js"></script>
+    <script src="js/modules/pekerjaan.js"></script>
+    <script src="js/modules/material.js"></script>
+    <script src="js/modules/rab.js"></script>
+    <script src="js/modules/realisasi.js"></script>
+    <script src="js/modules/penyedia.js"></script>
+    <script src="js/modules/kontrak.js"></script>
+    <script src="js/modules/laporan.js"></script>
+    <script src="js/modules/detail.js"></script>
+    <script src="js/modules/rekap.js"></script>
+    <script src="js/modules/rekaprabpengadaan.js"></script>
+    <script src="js/modules/user.js"></script>
+    <script src="js/modules/pengaturan.js"></script>
+    <script src="js/modules/log.js"></script>
+
+    <!-- 3. ENTRY POINT: state & DOMContentLoaded (load terakhir) -->
+    <script src="js/app.js"></script>
 </body>
 
 </html>
