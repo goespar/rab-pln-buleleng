@@ -10,6 +10,20 @@ function formatShortCurrency(amount) {
     return CONFIG.formatCurrency(amount);
 }
 
+function resolveLogModule(activity) {
+    const text = String(activity || '').toLowerCase();
+    if (text.includes('rab')) return 'RAB';
+    if (text.includes('realisasi')) return 'Realisasi';
+    if (text.includes('kontrak') || text.includes('spk')) return 'Kontrak / SPK';
+    if (text.includes('pekerjaan')) return 'Pekerjaan';
+    if (text.includes('pengadaan') || text.includes('tender')) return 'Pengadaan / Tender';
+    if (text.includes('material')) return 'Material';
+    if (text.includes('penyedia')) return 'Penyedia';
+    if (text.includes('catatan')) return 'Catatan';
+    if (text.includes('user') || text.includes('pengguna')) return 'Pengguna';
+    return 'Sistem';
+}
+
 async function logAktivitas(pekerjaanId, jenisAktivitas, catatan, userName = null) {
     try {
         const currentUser = userName || (state.currentUser ? state.currentUser.nama : 'Admin');
@@ -19,10 +33,11 @@ async function logAktivitas(pekerjaanId, jenisAktivitas, catatan, userName = nul
             user: currentUser,
             data: {
                 pekerjaan_id: pekerjaanId,
-                tanggal: new Date().toISOString().split('T')[0],
+                tanggal: new Date().toISOString(),
                 catatan: catatan,
                 user: currentUser,
-                jenis_aktivitas: jenisAktivitas
+                jenis_aktivitas: jenisAktivitas,
+                modul: resolveLogModule(jenisAktivitas)
             }
         };
         await fetchAPI('', 'POST', payload);

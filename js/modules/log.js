@@ -24,11 +24,12 @@ window.renderLog = async function renderLog() {
                             <th class="p-3">Waktu</th>
                             <th class="p-3">Pengguna</th>
                             <th class="p-3">Aktivitas</th>
+                            <th class="p-3">Detail</th>
                             <th class="p-3">Modul</th>
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-slate-100 text-slate-600" id="log-tbody">
-                        <tr><td colspan="5" class="p-8 text-center"><div class="loader mx-auto"></div></td></tr>
+                        <tr><td colspan="6" class="p-8 text-center"><div class="loader mx-auto"></div></td></tr>
                     </tbody>
                 </table>
             </div>
@@ -48,7 +49,7 @@ async function loadLogData() {
     const logList = await fetchAPI('action=list&table=LogAktivitas') || [];
 
     if (logList.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="5" class="p-8 text-center text-slate-400 italic">Belum ada log aktivitas.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="6" class="p-8 text-center text-slate-400 italic">Belum ada log aktivitas.</td></tr>';
         return;
     }
 
@@ -60,14 +61,9 @@ async function loadLogData() {
     sorted.slice(0, 50).forEach((log, i) => {
         const avatarLetter = (log.user || 'S').charAt(0).toUpperCase();
         const avatarColor  = i % 3 === 0 ? 'bg-brand' : (i % 3 === 1 ? 'bg-blue-500' : 'bg-emerald-500');
-        const jenisLower   = (log.jenis_aktivitas || '').toLowerCase();
-        const modulBadge   = jenisLower.includes('rab') ? 'RAB' :
-                             jenisLower.includes('realisasi') ? 'Realisasi' :
-                             jenisLower.includes('kontrak') ? 'Kontrak' :
-                             jenisLower.includes('pekerjaan') ? 'Pekerjaan' :
-                             jenisLower.includes('material') ? 'Material' :
-                             jenisLower.includes('penyedia') ? 'Penyedia' :
-                             jenisLower.includes('catatan') ? 'Catatan' : 'Sistem';
+        const aktivitas = log.jenis_aktivitas || log.aktivitas || 'Aktivitas Sistem';
+        const detail = log.catatan || log.keterangan || log.detail || '-';
+        const modulBadge = log.modul || resolveLogModule(aktivitas);
         html += `
             <tr class="hover:bg-slate-50">
                 <td class="p-3 text-center text-slate-500">${i + 1}</td>
@@ -78,7 +74,8 @@ async function loadLogData() {
                         ${log.user || '-'}
                     </span>
                 </td>
-                <td class="p-3">${log.catatan || log.keterangan || '-'}</td>
+                <td class="p-3 font-semibold text-slate-800">${aktivitas}</td>
+                <td class="p-3 text-xs text-slate-600">${detail}</td>
                 <td class="p-3"><span class="bg-slate-100 px-2 py-0.5 rounded text-xs">${modulBadge}</span></td>
             </tr>
         `;
