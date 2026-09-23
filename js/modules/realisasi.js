@@ -166,6 +166,12 @@ async function loadRealisasiData(pekerjaanId) {
         const progress = parseFloat(r.progress) || 0;
         totalNilai    += nilai;
         totalProgress += progress;
+        const statusPembayaran = r.status_pembayaran || 'Belum Dibayar';
+        const statusPembayaranClass = statusPembayaran === 'Dibayar'
+            ? 'bg-emerald-100 text-emerald-700'
+            : statusPembayaran === 'Diproses'
+                ? 'bg-blue-100 text-blue-700'
+                : 'bg-amber-100 text-amber-700';
         rows += `
             <tr class="hover:bg-slate-50 transition-colors">
                 <td class="px-4 py-3 text-center text-slate-500">${i + 1}</td>
@@ -181,7 +187,7 @@ async function loadRealisasiData(pekerjaanId) {
                     </div>
                 </td>
                 <td class="px-4 py-3 text-slate-500 text-xs">${r.keterangan || '-'}</td>
-                <td class="px-4 py-3 text-center text-xs">${r.status_pembayaran || 'Belum Dibayar'}</td>
+                <td class="px-4 py-3 text-center text-xs"><span class="px-2 py-1 rounded ${statusPembayaranClass} font-semibold">${statusPembayaran}</span></td>
                 <td class="px-4 py-3 text-center flex justify-center gap-2">
                     <button onclick="editRealisasi('${r.id}')" class="text-blue-500 hover:text-blue-700 p-1"><i data-lucide="edit" class="w-4 h-4"></i></button>
                     <button onclick="deleteRealisasi('${r.id}')" class="text-red-400 hover:text-red-600 p-1"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
@@ -319,6 +325,7 @@ async function saveRealisasi(event) {
             closeModalRealisasi();
             state.editingRealisasiId = null;
             loadRealisasiData(state.selectedPekerjaanRealisasi);
+            renderRingkasanKontrakRealisasi(state.selectedPekerjaanRealisasi);
         } else {
             throw new Error('Gagal menyimpan data ke Google Sheets');
         }
@@ -338,6 +345,7 @@ async function deleteRealisasi(id) {
     if (result) {
         showToast('Realisasi dihapus');
         loadRealisasiData(state.selectedPekerjaanRealisasi);
+        renderRingkasanKontrakRealisasi(state.selectedPekerjaanRealisasi);
     }
 }
 
