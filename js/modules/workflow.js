@@ -220,15 +220,21 @@ window.saveWorkflowTender = async function saveWorkflowTender(event) {
     const nilai = Number(document.getElementById('workflow-tender-nilai').value) || 0;
     if (!pekerjaanId || !penyediaId || nilai <= 0) return showToast('Lengkapi data tender dengan benar', 'error');
 
+    const tenderLama = (window.workflowData?.tender || [])
+        .filter(item => String(item.pekerjaan_id) === String(pekerjaanId))
+        .sort((a, b) => String(b.tanggal_tender || '').localeCompare(String(a.tanggal_tender || '')))[0];
+    const tenderData = {
+        pekerjaan_id: pekerjaanId,
+        penyedia_id: penyediaId,
+        nilai_penawaran: nilai,
+        tanggal_tender: document.getElementById('workflow-tender-tanggal').value,
+        status_tender: 'Selesai'
+    };
+
     const result = await fetchAPI('', 'POST', {
-        action: 'create', table: 'Tender',
-        data: {
-            pekerjaan_id: pekerjaanId,
-            penyedia_id: penyediaId,
-            nilai_penawaran: nilai,
-            tanggal_tender: document.getElementById('workflow-tender-tanggal').value,
-            status_tender: 'Selesai'
-        }
+        action: tenderLama ? 'update' : 'create',
+        table: 'Tender',
+        data: tenderLama ? { id: tenderLama.id, ...tenderData } : tenderData
     });
     if (!result) return;
 
@@ -238,7 +244,7 @@ window.saveWorkflowTender = async function saveWorkflowTender(event) {
     }
     invalidateCache('Tender');
     invalidateCache('Pekerjaan');
-    showToast('Hasil tender berhasil disimpan');
+    showToast(tenderLama ? 'Hasil tender diperbarui, tidak dibuat duplikat' : 'Hasil tender berhasil disimpan');
     renderWorkflow();
 };
 
