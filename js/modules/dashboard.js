@@ -8,14 +8,15 @@ window.renderDashboard = async function renderDashboard(filters = {}) {
     if (!contentArea) return;
     contentArea.innerHTML = '<div class="flex justify-center items-center py-24"><div class="loader"></div></div>';
 
-    const [data, pekerjaanList, kontrakList, realisasiList, pengadaanList, rabList, prkList] = await Promise.all([
+    const [data, pekerjaanList, kontrakList, realisasiList, pengadaanList, rabList, prkList, jenisProgramList] = await Promise.all([
         fetchAPI('action=dashboard'),
         fetchWithCache('Pekerjaan'),
         fetchWithCache('Kontrak'),
         fetchWithCache('Realisasi'),
         fetchWithCache('Pengadaan'),
         fetchWithCache('RAB'),
-        fetchWithCache('prk')
+        fetchWithCache('prk'),
+        fetchWithCache('jenis_program')
     ]);
 
     let pekerjaanArr   = Array.isArray(pekerjaanList)  ? pekerjaanList  : [];
@@ -24,6 +25,7 @@ window.renderDashboard = async function renderDashboard(filters = {}) {
     const pengadaanArr = Array.isArray(pengadaanList)  ? pengadaanList  : [];
     const rabArr       = Array.isArray(rabList)        ? rabList        : [];
     const prkArr       = Array.isArray(prkList)        ? prkList        : [];
+    const jenisProgramArr = Array.isArray(jenisProgramList) ? jenisProgramList : [];
 
     // Lokasi unik untuk dropdown
     const lokasiUnique = [...new Set(pekerjaanArr.map(p => p.lokasi).filter(l => l))].sort();
@@ -172,11 +174,13 @@ window.renderDashboard = async function renderDashboard(filters = {}) {
                 String(item.status_pembayaran || '').trim().toLowerCase() === 'dibayar')
             .reduce((sum, item) => sum + (Number(item.nilai) || 0), 0);
         const disburse = Number(pengadaan.nilai_disburse) || 0;
-        const prk = prkArr.find(item => String(item.id) === String(pengadaan.id_prk || pengadaan.prk_id || pengadaan.id_prk_program));
+        const jenisProgram = jenisProgramArr.find(item => String(item.id) === String(pengadaan.id_jenis || pengadaan.jenis_id));
+        const prkId = pengadaan.id_prk || pengadaan.prk_id || pengadaan.id_prk_program || jenisProgram?.id_prk;
+        const prk = prkArr.find(item => String(item.id) === String(prkId));
         const anggaranInvestasi = Number(pengadaan.nilai_pagu) || Number(prk?.pagu_dana) || 0;
         return {
-            nomor: pengadaan.nomor_pengadaan || '-',
-            nama: pengadaan.nama_pengadaan || '-',
+            nomor: prk?.no_prk || '-',
+            nama: prk?.prk || prk?.nama || prk?.uraian || '-',
             pagu: anggaranInvestasi,
             disburse,
             rab: totalRAB,
