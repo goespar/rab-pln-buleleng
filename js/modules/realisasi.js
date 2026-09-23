@@ -5,8 +5,12 @@
 
 window.renderRealisasi = async function renderRealisasi() {
     const contentArea = document.getElementById('app-content');
-    const pekerjaanList = await fetchWithCache('Pekerjaan') || [];
+    const [pekerjaanList, kontrakList] = await Promise.all([
+        fetchWithCache('Pekerjaan'),
+        fetchWithCache('Kontrak')
+    ]);
     window.allPekerjaanList = pekerjaanList;
+    window.allKontrakListRealisasi = kontrakList || [];
 
     let dropdownOptions = '<option value="">-- Pilih Paket Pekerjaan --</option>';
     pekerjaanList.forEach(p => {
@@ -33,6 +37,8 @@ window.renderRealisasi = async function renderRealisasi() {
                 </select>
             </div>
 
+            <div id="realisasi-ringkasan-kontrak" class="hidden grid grid-cols-1 sm:grid-cols-3 gap-3 mb-6"></div>
+
             <div id="realisasi-table-container">
                 <div class="text-center py-12 text-slate-400 bg-slate-50 rounded-lg border-2 border-dashed border-slate-200">
                     <i data-lucide="trending-up" class="w-12 h-12 mx-auto mb-3 text-slate-300"></i>
@@ -55,6 +61,10 @@ window.renderRealisasi = async function renderRealisasi() {
                             <input type="date" id="realisasi-tanggal" required class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:border-emerald-500 outline-none">
                         </div>
                         <div class="grid grid-cols-2 gap-4">
+                            <div>
+                                <label class="block text-sm font-medium text-slate-700 mb-1">Nomor Termin</label>
+                                <input type="number" min="1" id="realisasi-termin" required class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:border-emerald-500 outline-none">
+                            </div>
                             <div>
                                 <label class="block text-sm font-medium text-slate-700 mb-1">Nilai Terserap (Rp)</label>
                                 <input type="number" id="realisasi-nilai" required class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:border-emerald-500 outline-none">
@@ -89,14 +99,37 @@ function handleSelectPekerjaanRealisasi(id) {
         state.selectedPengadaanNamaRealisasi   = selectedObj ? (selectedObj.nama_pengadaan || '') : '';
     }
     const btnAdd = document.getElementById('btn-add-realisasi');
+    const ringkasan = document.getElementById('realisasi-ringkasan-kontrak');
     if (id) {
         if (btnAdd) btnAdd.classList.remove('hidden');
+        renderRingkasanKontrakRealisasi(id);
         loadRealisasiData(id);
     } else {
         if (btnAdd) btnAdd.classList.add('hidden');
+        if (ringkasan) ringkasan.classList.add('hidden');
         const container = document.getElementById('realisasi-table-container');
         if (container) container.innerHTML = '<div class="text-center py-12 text-slate-400 bg-slate-50 rounded-lg border-2 border-dashed border-slate-200"><p>Silakan pilih paket pekerjaan terlebih dahulu.</p></div>';
     }
+}
+
+async function renderRingkasanKontrakRealisasi(pekerjaanId) {
+    const ringkasan = document.getElementById('realisasi-ringkasan-kontrak');
+    if (!ringkasan) return;
+    const kontrak = (window.allKontrakListRealisasi || []).find(item => String(item.pekerjaan_id) === String(pekerjaanId));
+    const realisasi = await fetchAPI('action=list&table=Realisasi') || [];
+    const totalRealisasi = realisasi
+        .filter(item => String(item.pekerjaan_id) === String(pekerjaanId))
+        .reduce((sum, item) => sum + (Number(item.nilai) || 0), 0);
+    const nilaiKontrak = Number(kontrak?.nilai_kontrak) || 0;
+    const sisa = nilaiKontrak - totalRealisasi;
+    const jumlahTermin = realisasi.filter(item => String(item.pekerjaan_id) === String(pekerjaanId)).length;
+
+    ringkasan.classList.remove('hidden');
+    ringkasan.innerHTML = `
+        <div class="bg-blue-50 border border-blue-100 rounded-lg p-3"><p class="text-xs text-slate-500">Nilai Kontrak</p><p class="font-bold text-brand mt-1">${CONFIG.formatCurrency(nilaiKontrak)}</p></div>
+        <div class="bg-emerald-50 border border-emerald-100 rounded-lg p-3"><p class="text-xs text-slate-500">Total Realisasi</p><p class="font-bold text-emerald-600 mt-1">${CONFIG.formatCurrency(totalRealisasi)}</p></div>
+        <div class="bg-amber-50 border border-amber-100 rounded-lg p-3"><p class="text-xs text-slate-500">Sisa Kontrak</p><p class="font-bold text-amber-600 mt-1">${CONFIG.formatCurrency(sisa > 0 ? sisa : 0)}</p></div>`;
+    window.realisasiTerminBerikutnya = jumlahTermin + 1;
 }
 
 async function loadRealisasiData(pekerjaanId) {
@@ -128,6 +161,7 @@ async function loadRealisasiData(pekerjaanId) {
         rows += `
             <tr class="hover:bg-slate-50 transition-colors">
                 <td class="px-4 py-3 text-center text-slate-500">${i + 1}</td>
+                <td class="px-4 py-3 text-center font-semibold text-brand">${r.termin || i + 1}</td>
                 <td class="px-4 py-3 font-medium">${CONFIG.formatDate(r.tanggal)}</td>
                 <td class="px-4 py-3 text-right font-semibold text-emerald-600">${CONFIG.formatCurrency(nilai)}</td>
                 <td class="px-4 py-3 text-center">
@@ -152,6 +186,7 @@ async function loadRealisasiData(pekerjaanId) {
                 <thead>
                     <tr class="bg-slate-100 border-b border-slate-200 text-slate-700 font-semibold">
                         <th class="px-4 py-3 text-center w-12">No</th>
+                        <th class="px-4 py-3 text-center">Termin</th>
                         <th class="px-4 py-3">Tanggal</th>
                         <th class="px-4 py-3 text-right">Nilai Terserap (Rp)</th>
                         <th class="px-4 py-3 text-center">Progress Fisik</th>
@@ -162,7 +197,7 @@ async function loadRealisasiData(pekerjaanId) {
                 <tbody class="divide-y divide-slate-100">${rows}</tbody>
                 <tfoot class="bg-emerald-50 border-t-2 border-emerald-200">
                     <tr class="font-bold text-slate-800">
-                        <td colspan="2" class="px-4 py-3 text-right">TOTAL KUMULATIF</td>
+                        <td colspan="3" class="px-4 py-3 text-right">TOTAL KUMULATIF</td>
                         <td class="px-4 py-3 text-right text-emerald-600">${CONFIG.formatCurrency(totalNilai)}</td>
                         <td class="px-4 py-3 text-center text-brand">${totalProgress.toFixed(1)}%</td>
                         <td colspan="2"></td>
@@ -177,6 +212,7 @@ function showModalRealisasi() {
     const modal = document.getElementById('modal-realisasi');
     if (!modal) return;
     state.editingRealisasiId = null;
+    document.getElementById('realisasi-termin').value = window.realisasiTerminBerikutnya || 1;
     document.getElementById('realisasi-tanggal').value  = new Date().toISOString().split('T')[0];
     document.getElementById('realisasi-nilai').value    = '';
     document.getElementById('realisasi-progress').value = '';
@@ -196,6 +232,7 @@ async function editRealisasi(id) {
 
     state.editingRealisasiId = id;
     document.getElementById('realisasi-tanggal').value  = realisasi.tanggal;
+    document.getElementById('realisasi-termin').value   = realisasi.termin || '';
     document.getElementById('realisasi-nilai').value    = realisasi.nilai;
     document.getElementById('realisasi-progress').value = realisasi.progress;
     document.getElementById('realisasi-ket').value      = realisasi.keterangan || '';
@@ -233,6 +270,7 @@ async function saveRealisasi(event) {
         pekerjaan_id:          state.selectedPekerjaanRealisasi,
         nama_pekerjaan:        state.selectedPekerjaanNamaRealisasi,
         tanggal:               document.getElementById('realisasi-tanggal').value,
+        termin:                document.getElementById('realisasi-termin').value,
         nilai:                 document.getElementById('realisasi-nilai').value,
         progress:              document.getElementById('realisasi-progress').value,
         keterangan:            document.getElementById('realisasi-ket').value
