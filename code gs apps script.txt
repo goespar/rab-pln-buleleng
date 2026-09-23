@@ -21,8 +21,8 @@ function doGet(e) {
 function doPost(e) {
   try {
     var payload = JSON.parse(e.postData.contents);
-    var action = payload.action;
-    var table = payload.table;
+    var action = payload.action || (e.parameter && e.parameter.action);
+    var table = payload.table || (e.parameter && e.parameter.table);
     var rowData = payload.data || {};
 
     if (action === 'simpanRABTerkoreksi') {

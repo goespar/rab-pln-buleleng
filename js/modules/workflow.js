@@ -277,7 +277,12 @@ window.saveWorkflowKoreksi = async function saveWorkflowKoreksi(pekerjaanId, fac
         jumlah: workflowItemTotal(item) * factor
     }));
 
-    const result = await fetchAPI('', 'POST', { action: 'simpanRABTerkoreksi', pekerjaan_id: pekerjaanId, dataKoreksi });
+    const result = await fetchAPI('', 'POST', {
+        action: 'simpanRABTerkoreksi',
+        table: 'RAB',
+        pekerjaan_id: pekerjaanId,
+        dataKoreksi
+    });
     if (result) {
         invalidateCache('RAB');
         invalidateCache('Pekerjaan');
