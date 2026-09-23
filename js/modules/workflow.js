@@ -118,18 +118,69 @@ window.loadWorkflowHPS = function loadWorkflowHPS(pekerjaanId) {
     target.innerHTML = rows.length ? `
         <div class="overflow-x-auto rounded-lg border border-slate-200">
             <table class="w-full text-sm text-left">
-                <thead class="bg-slate-100 text-slate-600"><tr><th class="p-3">Uraian</th><th class="p-3">Volume</th><th class="p-3">Satuan</th><th class="p-3">Harga Material</th><th class="p-3">Harga Jasa</th><th class="p-3">Aksi</th></tr></thead>
+                <thead class="bg-slate-100 text-slate-600"><tr><th class="p-3">Uraian</th><th class="p-3">Volume</th><th class="p-3">Satuan</th><th class="p-3">Harga Satuan Material</th><th class="p-3">Harga Satuan Jasa</th><th class="p-3">Bagian Material</th><th class="p-3">Bagian Jasa</th><th class="p-3">Total Jumlah</th><th class="p-3">Aksi</th></tr></thead>
                 <tbody class="divide-y divide-slate-100">${rows.map(item => `
-                    <tr>
+                    <tr data-hps-row="${item.id}">
                         <td class="p-3"><input data-hps-field="uraian" data-id="${item.id}" value="${escapeWorkflowHtml(item.uraian)}" class="w-full min-w-48 border border-slate-200 rounded px-2 py-1"></td>
-                        <td class="p-3"><input data-hps-field="volume" data-id="${item.id}" type="number" step="any" value="${item.volume || 0}" class="w-24 border border-slate-200 rounded px-2 py-1"></td>
+                        <td class="p-3"><input data-hps-field="volume" data-id="${item.id}" type="number" step="any" value="${item.volume || 0}" oninput="updateWorkflowHPSTotals()" class="w-24 border border-slate-200 rounded px-2 py-1"></td>
                         <td class="p-3"><input data-hps-field="satuan" data-id="${item.id}" value="${escapeWorkflowHtml(item.satuan)}" class="w-20 border border-slate-200 rounded px-2 py-1"></td>
-                        <td class="p-3"><input data-hps-field="harga_material" data-id="${item.id}" type="number" step="any" value="${item.harga_material || 0}" class="w-32 border border-slate-200 rounded px-2 py-1"></td>
-                        <td class="p-3"><input data-hps-field="harga_jasa" data-id="${item.id}" type="number" step="any" value="${item.harga_jasa || 0}" class="w-32 border border-slate-200 rounded px-2 py-1"></td>
+                        <td class="p-3"><input data-hps-field="harga_material" data-id="${item.id}" type="number" step="any" value="${item.harga_material || 0}" oninput="updateWorkflowHPSTotals()" class="w-32 border border-slate-200 rounded px-2 py-1"></td>
+                        <td class="p-3"><input data-hps-field="harga_jasa" data-id="${item.id}" type="number" step="any" value="${item.harga_jasa || 0}" oninput="updateWorkflowHPSTotals()" class="w-32 border border-slate-200 rounded px-2 py-1"></td>
+                        <td class="p-3 text-right font-medium" data-hps-result="bagian-material" data-id="${item.id}">Rp 0</td>
+                        <td class="p-3 text-right font-medium" data-hps-result="bagian-jasa" data-id="${item.id}">Rp 0</td>
+                        <td class="p-3 text-right font-bold text-brand" data-hps-result="jumlah" data-id="${item.id}">Rp 0</td>
                         <td class="p-3"><button type="button" onclick="saveWorkflowHPS('${item.id}', '${pekerjaanId}')" class="text-brand hover:text-sky-700 font-semibold">Simpan</button></td>
                     </tr>`).join('')}</tbody>
+                <tfoot class="bg-slate-50 border-t-2 border-slate-200 font-bold">
+                    <tr><td colspan="3" class="p-3 text-right">TOTAL</td><td id="workflow-hps-total-harga-material" class="p-3 text-right">Rp 0</td><td id="workflow-hps-total-harga-jasa" class="p-3 text-right">Rp 0</td><td id="workflow-hps-total-bagian-material" class="p-3 text-right">Rp 0</td><td id="workflow-hps-total-bagian-jasa" class="p-3 text-right">Rp 0</td><td id="workflow-hps-total-jumlah" class="p-3 text-right text-brand">Rp 0</td><td></td></tr>
+                </tfoot>
             </table>
         </div>` : '<div class="p-6 text-center text-slate-400 border border-dashed rounded-lg">Belum ada item HPS untuk pekerjaan ini.</div>';
+    updateWorkflowHPSTotals();
+};
+
+window.updateWorkflowHPSTotals = function updateWorkflowHPSTotals() {
+    let totalHargaMaterial = 0;
+    let totalHargaJasa = 0;
+    let totalBagianMaterial = 0;
+    let totalBagianJasa = 0;
+    let totalJumlah = 0;
+
+    document.querySelectorAll('[data-hps-row]').forEach(row => {
+        const id = row.dataset.hpsRow;
+        const volume = Number(row.querySelector('[data-hps-field="volume"]')?.value) || 0;
+        const hargaMaterial = Number(row.querySelector('[data-hps-field="harga_material"]')?.value) || 0;
+        const hargaJasa = Number(row.querySelector('[data-hps-field="harga_jasa"]')?.value) || 0;
+        const bagianMaterial = volume * hargaMaterial;
+        const bagianJasa = volume * hargaJasa;
+        const jumlah = bagianMaterial + bagianJasa;
+
+        totalHargaMaterial += hargaMaterial;
+        totalHargaJasa += hargaJasa;
+        totalBagianMaterial += bagianMaterial;
+        totalBagianJasa += bagianJasa;
+        totalJumlah += jumlah;
+
+        const setResult = (name, value) => {
+            const element = document.querySelector(`[data-hps-result="${name}"][data-id="${id}"]`);
+            if (element) element.textContent = CONFIG.formatCurrency(value);
+        };
+        setResult('bagian-material', bagianMaterial);
+        setResult('bagian-jasa', bagianJasa);
+        setResult('jumlah', jumlah);
+    });
+
+    const totals = {
+        'workflow-hps-total-harga-material': totalHargaMaterial,
+        'workflow-hps-total-harga-jasa': totalHargaJasa,
+        'workflow-hps-total-bagian-material': totalBagianMaterial,
+        'workflow-hps-total-bagian-jasa': totalBagianJasa,
+        'workflow-hps-total-jumlah': totalJumlah
+    };
+    Object.entries(totals).forEach(([id, value]) => {
+        const element = document.getElementById(id);
+        if (element) element.textContent = CONFIG.formatCurrency(value);
+    });
 };
 
 window.saveWorkflowHPS = async function saveWorkflowHPS(itemId, pekerjaanId) {
