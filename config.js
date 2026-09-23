@@ -1,7 +1,7 @@
 // config.js
 const CONFIG = {
     // TODO: Ganti URL di bawah ini dengan URL Web App Apps Script Anda dari Tahap 1
-    API_URL: 'https://script.google.com/macros/s/AKfycbzxXguTLuAFBguiuJWx0dp7PMp6qibenDEM1P31Zs5WkTWy5EAJWqak-HhdGFLw0A1u/exec',
+    API_URL: 'https://script.google.com/macros/s/AKfycbw3Z2wa8TBZpZPULva3XY-j2IE8CeFzmZ_4r99YV_Dck8_mHhKni5E4REHsAMVkgqGk/exec',
     
     // Konfigurasi format mata uang
     formatCurrency: (amount) => {
