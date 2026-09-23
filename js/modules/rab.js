@@ -385,12 +385,14 @@ async function handleSelectPekerjaanRAB(id) {
         if (selectedObj) {
             const tahunValue  = selectedObj.tahun_anggaran || (pengadaanObj ? pengadaanObj.tahun : '-');
             const sumberValue = selectedObj.sumber_anggaran || (pengadaanObj ? pengadaanObj.sumber_anggaran : '-');
-            const lokasiValue = selectedObj.lokasi || document.getElementById('info-lokasi-manual').value || '-';
+            const lokasiInput = document.getElementById('info-lokasi-manual');
+            const lokasiValue = selectedObj.lokasi || (lokasiInput ? lokasiInput.value : '') || '';
             const el = (elId) => document.getElementById(elId);
             if (el('info-tahun'))    el('info-tahun').innerText    = tahunValue;
             if (el('info-sumber'))   el('info-sumber').innerText   = sumberValue;
             if (el('info-kegiatan')) el('info-kegiatan').innerText = selectedObj.jenis_kegiatan || selectedObj.jenis_tegangan || '-';
             if (el('info-volume'))   el('info-volume').innerText   = selectedObj.volume_paket || '-';
+            if (lokasiInput && selectedObj.lokasi) lokasiInput.value = selectedObj.lokasi;
         }
     }
 
@@ -736,6 +738,7 @@ async function saveAllRABToSheets() {
     if (btn) { btn.disabled = true; btn.innerHTML = '<div class="loader w-4 h-4 border-2 border-white border-t-transparent"></div> Menyimpan...'; }
 
     const currentUser = state.currentUser ? state.currentUser.nama : 'Admin';
+    const lokasi = document.getElementById('info-lokasi-manual')?.value.trim() || '';
     let successCount  = 0;
 
     for (let item of itemsNew) {
@@ -750,6 +753,7 @@ async function saveAllRABToSheets() {
             data: {
                 pengadaan_id: state.selectedPengadaanIdRAB, nama_pengadaan: state.selectedPengadaanNamaRAB,
                 pekerjaan_id: state.selectedPekerjaanRAB,   nama_pekerjaan: state.selectedPekerjaanNamaRAB,
+                lokasi: lokasi,
                 kategori: item.kategori, uraian: item.uraian, satuan: item.satuan,
                 volume: vol, harga_material: hMat, harga_jasa: hJasa,
                 bagian_material: vol*hMat, bagian_jasa: vol*hJasa, jumlah: vol*(hMat+hJasa)
