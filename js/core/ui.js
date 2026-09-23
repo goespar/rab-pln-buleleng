@@ -56,6 +56,7 @@ function navigate(page) {
         'pekerjaan'  : 'Master Pekerjaan',
         'material'   : 'Master Material',
         'laporan'    : 'Laporan & Monitoring',
+        'laporanrealisasi' : 'Laporan Realisasi',
         'log'        : 'Log Aktivitas',
         'user'       : 'Manajemen Pengguna',
         'pengaturan' : 'Pengaturan Sistem'
@@ -90,6 +91,7 @@ function navigate(page) {
         case 'pekerjaan'  : renderPekerjaan();   break;
         case 'material'   : renderMaterial();    break;
         case 'laporan'    : renderLaporan();     break;
+        case 'laporanrealisasi' : renderLaporanRealisasi(); break;
         case 'log'        : renderLog();         break;
         case 'user'       : renderUser();        break;
         case 'pengaturan' : renderPengaturan();  break;

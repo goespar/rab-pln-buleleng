@@ -194,8 +194,8 @@ window.renderDashboard = async function renderDashboard(filters = {}) {
 
     const rekapDisburseHTML = rekapDisburseRows.length === 0
         ? '<tr><td colspan="11" class="p-8 text-center text-slate-400 italic">Belum ada data pengadaan untuk direkap.</td></tr>'
-        : rekapDisburseRows.map((row, index) => `<tr class="border-b border-slate-100 hover:bg-slate-50">
-            <td class="p-3 text-center">${index + 1}</td><td class="p-3 font-semibold">${row.nomor}</td><td class="p-3 min-w-64">${row.nama}</td>
+        : rekapDisburseRows.map((row, index) => `<tr class="border-b border-slate-100 hover:bg-slate-50 align-top">
+            <td class="p-3 text-center">${index + 1}</td><td class="p-3 font-semibold whitespace-normal break-words min-w-36">${row.nomor}</td><td class="p-3 min-w-64 whitespace-normal break-words">${row.nama}</td>
             <td class="p-3 text-right">${CONFIG.formatCurrency(row.pagu)}</td><td class="p-3 text-right text-blue-700">${CONFIG.formatCurrency(row.disburse)}</td>
             <td class="p-3 text-right">${CONFIG.formatCurrency(row.rab)}</td><td class="p-3 text-right text-amber-700">${CONFIG.formatCurrency(row.pa)}</td>
             <td class="p-3 text-right text-brand">${CONFIG.formatCurrency(row.kontrak)}</td><td class="p-3 text-right text-slate-600">${CONFIG.formatCurrency(row.tagihan)}</td><td class="p-3 text-right text-emerald-700">${CONFIG.formatCurrency(row.bayar)}</td>
@@ -371,7 +371,7 @@ window.renderDashboard = async function renderDashboard(filters = {}) {
 
         <div class="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden mb-6">
             <div class="p-5 border-b border-slate-100 bg-slate-50/50"><h3 class="text-sm font-bold text-slate-800">Rekap Disburse Pengadaan</h3><p class="text-xs text-slate-500 mt-1">Nilai Disburse diisi manual pada Master Pengadaan.</p></div>
-            <div class="overflow-x-auto"><table class="w-full text-left text-xs whitespace-nowrap"><thead class="bg-slate-100 text-slate-700 font-semibold"><tr>
+            <div class="overflow-x-auto"><table class="w-full text-left text-xs table-fixed"><thead class="bg-slate-100 text-slate-700 font-semibold"><tr>
                 <th class="p-3 text-center">No</th><th class="p-3">No. PRK/Pengadaan</th><th class="p-3">Uraian Pengadaan</th><th class="p-3 text-right">ANGGARAN INVESTASI</th><th class="p-3 text-right">Disburse</th><th class="p-3 text-right">Total RAB</th><th class="p-3 text-right">Total PA</th><th class="p-3 text-right">Total Kontrak</th><th class="p-3 text-right">Tagihan/Realisasi</th><th class="p-3 text-right">Total Bayar</th><th class="p-3 text-right">SISA PRK</th>
             </tr></thead><tbody>${rekapDisburseHTML}</tbody></table></div>
         </div>
