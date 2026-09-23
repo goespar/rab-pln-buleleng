@@ -172,19 +172,19 @@ window.renderDashboard = async function renderDashboard(filters = {}) {
     const totalDashboardKontrak = dashboardPrkCards.reduce((sum, card) => sum + card.kontrak, 0);
     const totalDashboardBayar = dashboardPrkCards.reduce((sum, card) => sum + card.bayar, 0);
     const totalDashboardSisa = totalDashboardPagu - totalDashboardKontrak;
-    const dashboardSifatSummary = { Murni: { pagu: 0, kontrak: 0 }, Lanjutan: { pagu: 0, kontrak: 0 } };
+    const tahunDashboard = Number(filterTahun) || new Date().getFullYear();
+    const dashboardSifatSummary = { Murni: 0, Lanjutan: 0 };
     prkArr.forEach(prkItem => {
         const sifat = String(prkItem.sifat_prk || prkItem.sifat || '').trim();
-        if (!dashboardSifatSummary[sifat]) return;
-        const programIds = new Set(jenisProgramArr.filter(program => String(program.id_prk) === String(prkItem.id)).map(program => String(program.id)));
-        const pengadaanIds = new Set(pengadaanArr.filter(item => programIds.has(String(item.id_jenis))).map(item => String(item.id)));
-        const jobIds = new Set(pekerjaanArr.filter(item => pengadaanIds.has(String(item.pengadaan_id || item.id_pengadaan_prk))).map(item => String(item.id)));
-        dashboardSifatSummary[sifat].pagu += Number(prkItem.pagu_dana) || 0;
-        dashboardSifatSummary[sifat].kontrak += kontrakArr.filter(item => jobIds.has(String(item.pekerjaan_id))).reduce((sum, item) => sum + (Number(item.nilai_kontrak) || 0), 0);
+        if (!Object.prototype.hasOwnProperty.call(dashboardSifatSummary, sifat)) return;
+        const tahunPRK = Number(prkItem.tahun) || 0;
+        const tahunSesuai = sifat === 'Murni' ? tahunPRK === tahunDashboard : tahunPRK === tahunDashboard - 1;
+        if (tahunSesuai) dashboardSifatSummary[sifat] += Number(prkItem.pagu_dana) || 0;
     });
     const dashboardSifatMarkup = ['Murni', 'Lanjutan'].map(sifat => {
-        const summary = dashboardSifatSummary[sifat];
-        return `<div class="border border-slate-300 rounded-lg p-3 ${sifat === 'Murni' ? 'bg-emerald-50' : 'bg-amber-50'}"><div class="font-bold text-center uppercase text-xs mb-2">${sifat}</div><div class="grid grid-cols-3 gap-2 text-[10px]"><div><span class="text-slate-500">ANGGARAN INVESTASI</span><strong class="block mt-1">${formatShortCurrency(summary.pagu)}</strong></div><div><span class="text-slate-500">KONTRAK</span><strong class="block mt-1">${formatShortCurrency(summary.kontrak)}</strong></div><div><span class="text-slate-500">SISA ANGGARAN</span><strong class="block mt-1">${formatShortCurrency(summary.pagu - summary.kontrak)}</strong></div></div></div>`;
+        const totalDana = dashboardSifatSummary[sifat];
+        const tahunLabel = sifat === 'Murni' ? tahunDashboard : tahunDashboard - 1;
+        return `<div class="border border-slate-300 rounded-lg p-3 ${sifat === 'Murni' ? 'bg-emerald-50' : 'bg-amber-50'}"><div class="font-bold text-center uppercase text-xs mb-2">${sifat}</div><div class="text-center"><span class="text-slate-500 text-[10px]">TOTAL DANA TAHUN ${tahunLabel}</span><strong class="block mt-1 text-lg">${formatShortCurrency(totalDana)}</strong></div></div>`;
     }).join('');
     const dashboardPrkMarkup = dashboardPrkCards.length ? dashboardPrkCards.map((card, index) => `
         <div class="bg-white border border-slate-300 rounded-lg overflow-hidden">
