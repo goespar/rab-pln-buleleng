@@ -290,8 +290,14 @@ async function saveKontrak(event) {
         status:         document.getElementById('kontrak-status')?.value || 'Aktif'
     };
 
-    const pekerjaanTerpilih = window.allPekerjaanListKontrak.find(item => String(item.id) === String(pekerjaanId));
-    if (pekerjaanTerpilih && String(pekerjaanTerpilih.status || '').toLowerCase() !== 'disetujui pa') {
+    const pekerjaanTerbaru = await fetchAPI('action=list&table=Pekerjaan');
+    const pekerjaanTerpilih = (pekerjaanTerbaru || []).find(item => String(item.id) === String(pekerjaanId));
+    if (!pekerjaanTerpilih) {
+        if (btn) { btn.disabled = false; btn.innerHTML = 'Simpan Kontrak'; }
+        return showToast('Pekerjaan tidak ditemukan. Silakan pilih ulang pekerjaan.', 'error');
+    }
+
+    if (String(pekerjaanTerpilih.status || '').trim().toLowerCase() !== 'disetujui pa') {
         if (btn) { btn.disabled = false; btn.innerHTML = 'Simpan Kontrak'; }
         return showToast('Kontrak hanya dapat dibuat setelah disetujui PA.', 'error');
     }
