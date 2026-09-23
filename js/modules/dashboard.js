@@ -153,26 +153,20 @@ window.renderDashboard = async function renderDashboard(filters = {}) {
     });
     if (kontrakArr.length === 0 && totalPaket > 0) statusCounts['Belum Mulai'] = totalPaket;
 
-    const dashboardPrkCards = prkArr.map(prkItem => {
-        const programRows = jenisProgramArr.filter(program => String(program.id_prk) === String(prkItem.id));
-        const pengadaanIds = new Set(pengadaanArr.filter(item => programRows.some(program => String(program.id) === String(item.id_jenis))).map(item => String(item.id)));
-        const pekerjaanForPrk = pekerjaanArr.filter(item => pengadaanIds.has(String(item.pengadaan_id || item.id_pengadaan_prk)));
-        const pekerjaanIdsForPrk = new Set(pekerjaanForPrk.map(item => String(item.id)));
-        const rab = rabArr.filter(item => pekerjaanIdsForPrk.has(String(item.pekerjaan_id)) && String(item.versi_rab || '').toLowerCase() !== 'terkoreksi')
-            .reduce((sum, item) => sum + (Number(item.jumlah) || ((Number(item.volume) || 0) * ((Number(item.harga_material) || 0) + (Number(item.harga_jasa) || 0)))), 0);
-        const kontrak = kontrakArr.filter(item => pekerjaanIdsForPrk.has(String(item.pekerjaan_id))).reduce((sum, item) => sum + (Number(item.nilai_kontrak) || 0), 0);
-        const bayar = realisasiArr.filter(item => pekerjaanIdsForPrk.has(String(item.pekerjaan_id)) && String(item.status_pembayaran || '').trim().toLowerCase() === 'dibayar').reduce((sum, item) => sum + (Number(item.nilai) || 0), 0);
-        const pagu = Number(prkItem.pagu_dana) || 0;
-        const programs = programRows.map(program => {
-            const programPengadaanIds = new Set(pengadaanArr.filter(item => String(item.id_jenis) === String(program.id)).map(item => String(item.id)));
-            const programJobs = pekerjaanArr.filter(item => programPengadaanIds.has(String(item.pengadaan_id || item.id_pengadaan_prk)));
-            const jobIds = new Set(programJobs.map(item => String(item.id)));
-            const programKontrak = kontrakArr.filter(item => jobIds.has(String(item.pekerjaan_id))).reduce((sum, item) => sum + (Number(item.nilai_kontrak) || 0), 0);
-            const programBayar = realisasiArr.filter(item => jobIds.has(String(item.pekerjaan_id)) && String(item.status_pembayaran || '').trim().toLowerCase() === 'dibayar').reduce((sum, item) => sum + (Number(item.nilai) || 0), 0);
-            return { name: program.nama_program || program.kode_jenis || 'Program', kontrak: programKontrak, bayar: programBayar };
-        });
-        return { id: prkItem.id, no: prkItem.no_prk || '-', name: prkItem.prk || prkItem.nama || '-', pagu, rab, kontrak, sisa: pagu - kontrak, bayar, belumBayar: kontrak - bayar, programs };
-    }).filter(card => card.pagu || card.rab || card.kontrak || card.bayar);
+    const dashboardProgramMap = {};
+    jenisProgramArr.forEach(program => {
+        const code = String(program.kode_jenis || program.kode || program.jenis || 'LAINNYA').trim().toUpperCase();
+        if (!dashboardProgramMap[code]) dashboardProgramMap[code] = { id: code, no: code, name: program.nama_program || program.nama || code, pagu: 0, rab: 0, kontrak: 0, bayar: 0, programs: [] };
+        const card = dashboardProgramMap[code];
+        const programPengadaanIds = new Set(pengadaanArr.filter(item => String(item.id_jenis) === String(program.id)).map(item => String(item.id)));
+        const programJobs = pekerjaanArr.filter(item => programPengadaanIds.has(String(item.pengadaan_id || item.id_pengadaan_prk)));
+        const jobIds = new Set(programJobs.map(item => String(item.id)));
+        card.pagu += pengadaanArr.filter(item => programPengadaanIds.has(String(item.id))).reduce((sum, item) => sum + (Number(item.nilai_pagu) || Number(prkArr.find(prkItem => String(prkItem.id) === String(program.id_prk))?.pagu_dana) || 0), 0);
+        card.rab += rabArr.filter(item => jobIds.has(String(item.pekerjaan_id)) && String(item.versi_rab || '').toLowerCase() !== 'terkoreksi').reduce((sum, item) => sum + (Number(item.jumlah) || ((Number(item.volume) || 0) * ((Number(item.harga_material) || 0) + (Number(item.harga_jasa) || 0)))), 0);
+        card.kontrak += kontrakArr.filter(item => jobIds.has(String(item.pekerjaan_id))).reduce((sum, item) => sum + (Number(item.nilai_kontrak) || 0), 0);
+        card.bayar += realisasiArr.filter(item => jobIds.has(String(item.pekerjaan_id)) && String(item.status_pembayaran || '').trim().toLowerCase() === 'dibayar').reduce((sum, item) => sum + (Number(item.nilai) || 0), 0);
+    });
+    const dashboardPrkCards = Object.values(dashboardProgramMap).map(card => ({ ...card, sisa: card.pagu - card.kontrak, belumBayar: card.kontrak - card.bayar })).filter(card => card.pagu || card.rab || card.kontrak || card.bayar);
 
     const totalDashboardPagu = dashboardPrkCards.reduce((sum, card) => sum + card.pagu, 0);
     const totalDashboardKontrak = dashboardPrkCards.reduce((sum, card) => sum + card.kontrak, 0);
@@ -180,7 +174,7 @@ window.renderDashboard = async function renderDashboard(filters = {}) {
     const totalDashboardSisa = totalDashboardPagu - totalDashboardKontrak;
     const dashboardPrkMarkup = dashboardPrkCards.length ? dashboardPrkCards.map((card, index) => `
         <div class="bg-white border border-slate-300 rounded-lg overflow-hidden">
-            <div class="bg-cyan-400 text-slate-900 text-center font-bold text-xs p-2 uppercase">${escapeDashboardText(card.no)} - ${escapeDashboardText(card.name)}</div>
+            <div class="bg-cyan-400 text-slate-900 text-center font-bold text-xs p-2 uppercase">KODE PROGRAM: ${escapeDashboardText(card.no)} - ${escapeDashboardText(card.name)}</div>
             <div class="p-3 grid grid-cols-[100px_1fr] gap-3 items-center">
                 <div class="relative h-24"><canvas id="dashboard-prk-chart-${index}"></canvas></div>
                 <div class="grid grid-cols-2 gap-2 text-[10px]">
@@ -191,7 +185,6 @@ window.renderDashboard = async function renderDashboard(filters = {}) {
                     <div class="col-span-2"><span class="text-slate-500">BELUM TERBAYAR</span><strong class="block text-rose-700">${formatShortCurrency(card.belumBayar)}</strong></div>
                 </div>
             </div>
-            <div class="border-t border-slate-200 px-3 py-2 space-y-2">${card.programs.map(program => `<div class="flex justify-between gap-2 text-[10px]"><span class="font-semibold break-words">${escapeDashboardText(program.name)}</span><span class="text-right whitespace-nowrap">${formatShortCurrency(program.kontrak)} / ${formatShortCurrency(program.bayar)}</span></div>`).join('')}</div>
         </div>`).join('') : '<div class="p-6 text-center text-slate-400">Belum ada data PRK.</div>';
 
     const rekapDisburseRows = pengadaanArr.map(pengadaan => {
@@ -245,7 +238,7 @@ window.renderDashboard = async function renderDashboard(filters = {}) {
 
     contentArea.innerHTML = `
         <div class="bg-white border border-slate-200 rounded-xl p-5 mb-6 shadow-sm">
-            <div class="flex justify-between items-center mb-4"><div><h2 class="text-lg font-bold text-slate-800">DASHBOARD AI ${new Date().getFullYear()}</h2><p class="text-xs text-slate-500">Ringkasan Anggaran Investasi per PRK dan Program</p></div><i data-lucide="bar-chart-3" class="w-6 h-6 text-brand"></i></div>
+            <div class="flex justify-between items-center mb-4"><div><h2 class="text-lg font-bold text-slate-800">DASHBOARD AI ${new Date().getFullYear()}</h2><p class="text-xs text-slate-500">Rekap Anggaran Investasi per Kode Program</p></div><i data-lucide="bar-chart-3" class="w-6 h-6 text-brand"></i></div>
             <div class="grid grid-cols-2 md:grid-cols-5 gap-3 mb-5 text-xs">
                 <div class="bg-slate-50 border rounded-lg p-3"><span class="text-slate-500">ANGGARAN INVESTASI</span><strong class="block mt-1">${formatShortCurrency(totalDashboardPagu)}</strong></div>
                 <div class="bg-slate-50 border rounded-lg p-3"><span class="text-slate-500">TOTAL RAB</span><strong class="block mt-1">${formatShortCurrency(dashboardPrkCards.reduce((sum, card) => sum + card.rab, 0))}</strong></div>
