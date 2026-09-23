@@ -239,6 +239,19 @@ window.renderDashboard = async function renderDashboard(filters = {}) {
     contentArea.innerHTML = `
         <div class="bg-white border border-slate-200 rounded-xl p-5 mb-6 shadow-sm">
             <div class="flex justify-between items-center mb-4"><div><h2 class="text-lg font-bold text-slate-800">DASHBOARD AI ${new Date().getFullYear()}</h2><p class="text-xs text-slate-500">Rekap Anggaran Investasi per Kode Program</p></div><i data-lucide="bar-chart-3" class="w-6 h-6 text-brand"></i></div>
+            <div class="border border-slate-300 rounded-lg overflow-hidden mb-5">
+                <div class="bg-cyan-400 text-center text-slate-900 font-bold text-sm p-2 uppercase">KESELURUHAN DANA INVESTASI</div>
+                <div class="p-4 grid grid-cols-1 md:grid-cols-[130px_1fr] gap-4 items-center">
+                    <div class="relative h-28"><canvas id="dashboard-total-chart"></canvas></div>
+                    <div class="grid grid-cols-2 sm:grid-cols-5 gap-3 text-xs">
+                        <div><span class="text-slate-500">ANGGARAN INVESTASI</span><strong class="block mt-1">${formatShortCurrency(totalDashboardPagu)}</strong></div>
+                        <div><span class="text-slate-500">TOTAL KONTRAK</span><strong class="block mt-1">${formatShortCurrency(totalDashboardKontrak)}</strong><small class="text-slate-400">${totalDashboardPagu > 0 ? ((totalDashboardKontrak / totalDashboardPagu) * 100).toFixed(1) : '0'}%</small></div>
+                        <div><span class="text-slate-500">SISA PRK</span><strong class="block mt-1 text-amber-700">${formatShortCurrency(totalDashboardSisa)}</strong></div>
+                        <div><span class="text-slate-500">TERBAYAR</span><strong class="block mt-1 text-emerald-700">${formatShortCurrency(totalDashboardBayar)}</strong><small class="text-slate-400">${totalDashboardKontrak > 0 ? ((totalDashboardBayar / totalDashboardKontrak) * 100).toFixed(1) : '0'}%</small></div>
+                        <div><span class="text-slate-500">BELUM TERBAYAR</span><strong class="block mt-1 text-rose-700">${formatShortCurrency(totalDashboardKontrak - totalDashboardBayar)}</strong></div>
+                    </div>
+                </div>
+            </div>
             <div class="grid grid-cols-2 md:grid-cols-5 gap-3 mb-5 text-xs">
                 <div class="bg-slate-50 border rounded-lg p-3"><span class="text-slate-500">ANGGARAN INVESTASI</span><strong class="block mt-1">${formatShortCurrency(totalDashboardPagu)}</strong></div>
                 <div class="bg-slate-50 border rounded-lg p-3"><span class="text-slate-500">TOTAL RAB</span><strong class="block mt-1">${formatShortCurrency(dashboardPrkCards.reduce((sum, card) => sum + card.rab, 0))}</strong></div>
@@ -457,6 +470,8 @@ window.renderDashboard = async function renderDashboard(filters = {}) {
         const chart = document.getElementById(`dashboard-prk-chart-${index}`);
         if (chart) new Chart(chart, { type: 'doughnut', data: { labels: ['Kontrak', 'Sisa PRK'], datasets: [{ data: [Math.max(card.kontrak, 0), Math.max(card.pagu - card.kontrak, 0)], backgroundColor: ['#3b82f6', '#d1d5db'], borderWidth: 0 }] }, options: { responsive: true, maintainAspectRatio: false, cutout: '62%', plugins: { legend: { display: false } } } });
     });
+    const totalChart = document.getElementById('dashboard-total-chart');
+    if (totalChart) new Chart(totalChart, { type: 'doughnut', data: { labels: ['Kontrak', 'Sisa PRK'], datasets: [{ data: [Math.max(totalDashboardKontrak, 0), Math.max(totalDashboardSisa, 0)], backgroundColor: ['#3b82f6', '#d1d5db'], borderWidth: 0 }] }, options: { responsive: true, maintainAspectRatio: false, cutout: '64%', plugins: { legend: { display: false } } } });
 }
 
 function escapeDashboardText(value) {
