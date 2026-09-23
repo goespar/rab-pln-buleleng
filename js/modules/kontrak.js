@@ -64,6 +64,10 @@ window.renderKontrak = async function renderKontrak() {
                             <label class="block text-sm font-medium text-slate-700 mb-1">Nomor Kontrak *</label>
                             <input type="text" id="kontrak-nomor" required placeholder="Contoh: 001/KONTRAK/2026" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:border-brand outline-none">
                         </div>
+                        <div>
+                            <label class="block text-sm font-medium text-slate-700 mb-1">Nomor SPK</label>
+                            <input type="text" id="kontrak-spk" placeholder="Contoh: 001/SPK/2026" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:border-brand outline-none">
+                        </div>
                         <div class="grid grid-cols-2 gap-4">
                             <div>
                                 <label class="block text-sm font-semibold text-slate-700 mb-1">Nama Pekerjaan <span class="text-[10px] font-normal text-brand ml-1">← sinkron</span></label>
@@ -164,7 +168,7 @@ async function loadKontrakData() {
                 <tr class="hover:bg-slate-50 transition-colors">
                     <td class="px-4 py-3 text-center text-slate-500">${index + 1}</td>
                     <td class="px-4 py-3 font-medium text-slate-700">${k.nama_pekerjaan || '-'}<br><span class="text-[10px] text-slate-500">${k.nama_penyedia || '-'}</span></td>
-                    <td class="px-4 py-3 font-bold text-slate-800">${k.nomor_kontrak}</td>
+                    <td class="px-4 py-3 font-bold text-slate-800">${k.nomor_kontrak}<br><span class="text-[10px] font-normal text-slate-500">SPK: ${k.nomor_spk || '-'}</span></td>
                     <td class="px-4 py-3 text-right font-semibold text-emerald-600">${CONFIG.formatCurrency(k.nilai_kontrak)}</td>
                     <td class="px-4 py-3 text-slate-600">${k.tanggal_mulai || '-'} s.d ${k.tanggal_selesai || '-'}</td>
                     <td class="px-4 py-3 text-center">${statusBadge}</td>
@@ -183,7 +187,7 @@ async function loadKontrakData() {
 function showModalKontrak(isEdit = false) {
     if (!isEdit) {
         state.editId = null;
-        ['kontrak-nomor','kontrak-pekerjaan','kontrak-pekerjaan-manual','kontrak-penyedia','kontrak-penyedia-manual','kontrak-nilai','kontrak-tanggal','kontrak-mulai','kontrak-selesai','kontrak-tender'].forEach(id => {
+        ['kontrak-nomor','kontrak-spk','kontrak-pekerjaan','kontrak-pekerjaan-manual','kontrak-penyedia','kontrak-penyedia-manual','kontrak-nilai','kontrak-tanggal','kontrak-mulai','kontrak-selesai','kontrak-tender'].forEach(id => {
             const el = document.getElementById(id); if (el) el.value = '';
         });
         const statusEl = document.getElementById('kontrak-status');
@@ -227,6 +231,7 @@ async function editKontrak(id) {
 
     state.editId = id;
     document.getElementById('kontrak-nomor').value  = item.nomor_kontrak || '';
+    document.getElementById('kontrak-spk').value    = item.nomor_spk || '';
     document.getElementById('kontrak-nilai').value  = item.nilai_kontrak || '';
     document.getElementById('kontrak-tanggal').value = item.tanggal_kontrak || '';
     document.getElementById('kontrak-mulai').value  = item.tanggal_mulai || '';
@@ -274,6 +279,7 @@ async function saveKontrak(event) {
     const data = {
         pekerjaan_id:   pekerjaanId,
         nomor_kontrak:  document.getElementById('kontrak-nomor').value,
+        nomor_spk:      document.getElementById('kontrak-spk').value,
         nama_pekerjaan: namaPekerjaan,
         nama_penyedia:  namaPenyedia,
         nilai_kontrak:  document.getElementById('kontrak-nilai').value,
@@ -295,6 +301,10 @@ async function saveKontrak(event) {
             result = await fetchAPI('', 'POST', { action: 'create', table: 'Kontrak', user: currentUser, data });
         }
         if (result) {
+            if (pekerjaanId && pekerjaanId !== 'UNKNOWN') {
+                await fetchAPI('', 'POST', { action: 'update', table: 'Pekerjaan', data: { id: pekerjaanId, status: 'Kontrak' } });
+                invalidateCache('Pekerjaan');
+            }
             if (pekerjaanId && pekerjaanId !== 'UNKNOWN') {
                 const jenisAktivitas = isUpdate ? 'Update Kontrak' : 'Tambah Kontrak';
                 const catatan = `${jenisAktivitas} "${data.nomor_kontrak}" - Penyedia: ${data.nama_penyedia}, Nilai: ${CONFIG.formatCurrency(data.nilai_kontrak)}`;
