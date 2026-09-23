@@ -35,9 +35,36 @@ window.renderDashboard = async function renderDashboard(filters = {}) {
     const filterTahun  = filters.tahun  || '';
     const filterLokasi = filters.lokasi || '';
     const filterStatus = filters.status || '';
+    const filterProgram = filters.program || '';
+    const filterKeterangan = filters.keterangan || '';
+
+    // Filter berdasarkan Program (kode_jenis di jenisProgramArr)
+    if (filterProgram) {
+        const programIds = jenisProgramArr
+            .filter(p => String(p.kode_jenis || p.kode || '').toUpperCase() === filterProgram.toUpperCase())
+            .map(p => String(p.id));
+        const pengadaanIds = pengadaanArr
+            .filter(p => programIds.includes(String(p.id_jenis || '')))
+            .map(p => String(p.id));
+        pekerjaanArr = pekerjaanArr.filter(p => pengadaanIds.includes(String(p.pengadaan_id || p.id_pengadaan_prk)));
+    }
 
     if (filterTahun)  pekerjaanArr = pekerjaanArr.filter(p => String(p.tahun_anggaran) === String(filterTahun));
     if (filterLokasi) pekerjaanArr = pekerjaanArr.filter(p => (p.lokasi || '') === filterLokasi);
+
+    // Filter berdasarkan Keterangan (Murni/Lanjutan dari PRK sifat_prk)
+    if (filterKeterangan) {
+        const prkIds = prkArr
+            .filter(p => {
+                const sifat = String(p.sifat_prk || p.sifat || '').trim();
+                return sifat === filterKeterangan;
+            })
+            .map(p => String(p.id));
+        const pengadaanIdsKeterangan = pengadaanArr
+            .filter(p => prkIds.includes(String(p.id_prk || p.prk_id || '')))
+            .map(p => String(p.id));
+        pekerjaanArr = pekerjaanArr.filter(p => pengadaanIdsKeterangan.includes(String(p.pengadaan_id || p.id_pengadaan_prk)));
+    }
 
     const pekerjaanIds = pekerjaanArr.map(p => String(p.id));
     kontrakArr  = kontrakArr.filter(k => pekerjaanIds.includes(String(k.pekerjaan_id)));
@@ -289,6 +316,48 @@ window.renderDashboard = async function renderDashboard(filters = {}) {
         </tr>`).join('');
 
     contentArea.innerHTML = `
+        <!-- FILTER PROGRAM, TAHUN, KETERANGAN - PALING ATAS -->
+        <div class="bg-white p-4 rounded-xl shadow-sm border border-slate-100 mb-6">
+            <div class="flex flex-col md:flex-row gap-3 items-end">
+                <div class="flex-1 grid grid-cols-1 sm:grid-cols-4 gap-3">
+                    <div>
+                        <label class="block text-xs font-medium text-slate-600 mb-1.5">Program</label>
+                        <select id="dash-filter-program" onchange="applyDashboardFilter()" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:border-brand outline-none bg-white">
+                            <option value="">Semua Program</option>
+                            <option value="SAR">SAR</option>
+                            <option value="DAL">DAL</option>
+                            <option value="EFI">EFI</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-slate-600 mb-1.5">Tahun</label>
+                        <select id="dash-filter-tahun-baru" onchange="applyDashboardFilter()" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:border-brand outline-none bg-white">
+                            <option value="">Semua Tahun</option>
+                            ${[2024,2025,2026,2027,2028,2029,2030].map(y => `<option value="${y}" ${y===2026?'selected':''}>${y}</option>`).join('')}
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-slate-600 mb-1.5">Keterangan</label>
+                        <select id="dash-filter-keterangan" onchange="applyDashboardFilter()" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:border-brand outline-none bg-white">
+                            <option value="">Semua Keterangan</option>
+                            <option value="Murni">Murni</option>
+                            <option value="Lanjutan">Lanjutan</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-slate-600 mb-1.5">Lokasi / ULP</label>
+                        <select id="dash-filter-lokasi" onchange="applyDashboardFilter()" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:border-brand outline-none bg-white">
+                            <option value="">Semua Lokasi</option>
+                        </select>
+                    </div>
+                </div>
+                <button onclick="resetDashboardFilter()" class="border border-slate-300 hover:bg-slate-50 text-slate-600 rounded-lg px-4 py-2 text-sm font-medium flex items-center gap-2 transition whitespace-nowrap">
+                    <i data-lucide="x-circle" class="w-4 h-4"></i> Reset Filter
+                </button>
+            </div>
+        </div>
+
+        <!-- DASHBOARD AI 2026 -->
         <div class="bg-white border border-slate-200 rounded-xl p-5 mb-6 shadow-sm">
             <div class="flex justify-between items-center mb-4"><div><h2 class="text-lg font-bold text-slate-800">DASHBOARD AI ${new Date().getFullYear()}</h2><p class="text-xs text-slate-500">Rekap Anggaran Investasi per Kode Program</p></div><i data-lucide="bar-chart-3" class="w-6 h-6 text-brand"></i></div>
 
@@ -302,38 +371,13 @@ window.renderDashboard = async function renderDashboard(filters = {}) {
             <div class="grid grid-cols-1 gap-4 mb-5">${keseluruhanMarkup}</div>
             <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">${dashboardPrkMarkup}</div>
         </div>
-        <!-- FILTER -->
-        <div class="bg-white p-4 rounded-xl shadow-sm border border-slate-100 mb-6">
-            <div class="flex flex-col md:flex-row gap-3 items-end">
-                <div class="flex-1 grid grid-cols-1 sm:grid-cols-3 gap-3">
-                    <div>
-                        <label class="block text-xs font-medium text-slate-600 mb-1.5">Tahun Anggaran</label>
-                        <select id="dash-filter-tahun" onchange="applyDashboardFilter()" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:border-brand outline-none bg-white">
-                            <option value="">Semua Tahun</option>
-                            ${[2024,2025,2026,2027,2028].map(y => `<option value="${y}" ${y===2026?'selected':''}>${y}</option>`).join('')}
-                        </select>
-                    </div>
-                    <div>
-                        <label class="block text-xs font-medium text-slate-600 mb-1.5">Lokasi / ULP</label>
-                        <select id="dash-filter-lokasi" onchange="applyDashboardFilter()" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:border-brand outline-none bg-white">
-                            <option value="">Semua Lokasi</option>
-                        </select>
-                    </div>
-                    <div>
-                        <label class="block text-xs font-medium text-slate-600 mb-1.5">Status Pekerjaan</label>
-                        <select id="dash-filter-status" onchange="applyDashboardFilter()" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:border-brand outline-none bg-white">
-                            <option value="">Semua Status</option>
-                            <option value="Selesai">Selesai</option>
-                            <option value="On Progress">On Progress</option>
-                            <option value="Belum Mulai">Belum Mulai</option>
-                            <option value="Tunda">Tunda</option>
-                        </select>
-                    </div>
-                </div>
-                <button onclick="resetDashboardFilter()" class="border border-slate-300 hover:bg-slate-50 text-slate-600 rounded-lg px-4 py-2 text-sm font-medium flex items-center gap-2 transition whitespace-nowrap">
-                    <i data-lucide="x-circle" class="w-4 h-4"></i> Reset Filter
-                </button>
-            </div>
+
+        <!-- REKAP DISBURSE PENGADAAN - DIPINDAHKAN KE SINI -->
+        <div class="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden mb-6">
+            <div class="p-5 border-b border-slate-100 bg-slate-50/50"><h3 class="text-sm font-bold text-slate-800">Rekap Disburse Pengadaan</h3><p class="text-xs text-slate-500 mt-1">Nilai Disburse diisi manual pada Master Pengadaan.</p></div>
+            <div class="overflow-x-auto"><table class="w-full text-left text-xs table-fixed"><thead class="bg-slate-100 text-slate-700 font-semibold"><tr>
+                <th class="p-3 text-center">No</th><th class="p-3">No. PRK/Pengadaan</th><th class="p-3">Uraian Pengadaan</th><th class="p-3 text-right">ANGGARAN INVESTASI</th><th class="p-3 text-right">Disburse</th><th class="p-3 text-right">Total RAB</th><th class="p-3 text-right">Total PA</th><th class="p-3 text-right">Total Kontrak</th><th class="p-3 text-right">Tagihan/Realisasi</th><th class="p-3 text-right">Total Bayar</th><th class="p-3 text-right">SISA PRK</th>
+            </tr></thead><tbody>${rekapDisburseHTML}</tbody></table></div>
         </div>
 
         <!-- KARTU STATISTIK + BANNER -->
@@ -468,13 +512,6 @@ window.renderDashboard = async function renderDashboard(filters = {}) {
             </div>
         </div>
 
-        <div class="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden mb-6">
-            <div class="p-5 border-b border-slate-100 bg-slate-50/50"><h3 class="text-sm font-bold text-slate-800">Rekap Disburse Pengadaan</h3><p class="text-xs text-slate-500 mt-1">Nilai Disburse diisi manual pada Master Pengadaan.</p></div>
-            <div class="overflow-x-auto"><table class="w-full text-left text-xs table-fixed"><thead class="bg-slate-100 text-slate-700 font-semibold"><tr>
-                <th class="p-3 text-center">No</th><th class="p-3">No. PRK/Pengadaan</th><th class="p-3">Uraian Pengadaan</th><th class="p-3 text-right">ANGGARAN INVESTASI</th><th class="p-3 text-right">Disburse</th><th class="p-3 text-right">Total RAB</th><th class="p-3 text-right">Total PA</th><th class="p-3 text-right">Total Kontrak</th><th class="p-3 text-right">Tagihan/Realisasi</th><th class="p-3 text-right">Total Bayar</th><th class="p-3 text-right">SISA PRK</th>
-            </tr></thead><tbody>${rekapDisburseHTML}</tbody></table></div>
-        </div>
-
         <!-- QUICK ACCESS -->
         <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-100 mb-6">
             <h3 class="text-sm font-bold text-slate-700 mb-3">Quick Access</h3>
@@ -503,6 +540,11 @@ window.renderDashboard = async function renderDashboard(filters = {}) {
         lokasiDD.innerHTML = '<option value="">Semua Lokasi</option>' +
             window.dashboardLokasiOptions.map(lok => `<option value="${lok}" ${lok===filterLokasi?'selected':''}>${lok}</option>`).join('');
     }
+    
+    // Set nilai filter
+    if (document.getElementById('dash-filter-tahun-baru'))  document.getElementById('dash-filter-tahun-baru').value  = filterTahun;
+    if (document.getElementById('dash-filter-program'))  document.getElementById('dash-filter-program').value  = filterProgram;
+    if (document.getElementById('dash-filter-keterangan'))  document.getElementById('dash-filter-keterangan').value  = filterKeterangan;
     if (document.getElementById('dash-filter-tahun'))  document.getElementById('dash-filter-tahun').value  = filterTahun;
     if (document.getElementById('dash-filter-status')) document.getElementById('dash-filter-status').value = filterStatus;
 
@@ -519,10 +561,12 @@ function escapeDashboardText(value) {
 }
 
 function applyDashboardFilter() {
-    const tahun  = document.getElementById('dash-filter-tahun')?.value  || '';
+    const tahun  = document.getElementById('dash-filter-tahun-baru')?.value  || '';
+    const program = document.getElementById('dash-filter-program')?.value || '';
+    const keterangan = document.getElementById('dash-filter-keterangan')?.value || '';
     const lokasi = document.getElementById('dash-filter-lokasi')?.value || '';
     const status = document.getElementById('dash-filter-status')?.value || '';
-    renderDashboard({ tahun, lokasi, status });
+    renderDashboard({ tahun, program, keterangan, lokasi, status });
 }
 
 function resetDashboardFilter() { renderDashboard({}); }
