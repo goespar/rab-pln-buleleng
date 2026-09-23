@@ -289,6 +289,12 @@ async function saveKontrak(event) {
         status:         document.getElementById('kontrak-status')?.value || 'Aktif'
     };
 
+    const pekerjaanTerpilih = window.allPekerjaanListKontrak.find(item => String(item.id) === String(pekerjaanId));
+    if (pekerjaanTerpilih && String(pekerjaanTerpilih.status || '').toLowerCase() !== 'disetujui pa') {
+        if (btn) { btn.disabled = false; btn.innerHTML = 'Simpan Kontrak'; }
+        return showToast('Kontrak hanya dapat dibuat setelah disetujui PA.', 'error');
+    }
+
     const isUpdate    = state.editId && !String(state.editId).startsWith('temp_');
     const currentUser = state.currentUser ? state.currentUser.nama : 'Admin';
 

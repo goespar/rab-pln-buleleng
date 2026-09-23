@@ -33,6 +33,7 @@ window.renderWorkflow = async function renderWorkflow() {
                 <button type="button" onclick="switchWorkflowTab('hps')" data-workflow-tab="hps" class="workflow-tab px-4 py-2 rounded-lg bg-brand text-white text-sm font-semibold">Edit RAB HPS</button>
                 <button type="button" onclick="switchWorkflowTab('tender')" data-workflow-tab="tender" class="workflow-tab px-4 py-2 rounded-lg text-slate-600 hover:bg-white text-sm font-semibold">Hasil Tender</button>
                 <button type="button" onclick="switchWorkflowTab('koreksi')" data-workflow-tab="koreksi" class="workflow-tab px-4 py-2 rounded-lg text-slate-600 hover:bg-white text-sm font-semibold">Koreksi RAB</button>
+                <button type="button" onclick="switchWorkflowTab('pa')" data-workflow-tab="pa" class="workflow-tab px-4 py-2 rounded-lg text-slate-600 hover:bg-white text-sm font-semibold">Persetujuan PA</button>
             </div>
             <div id="workflow-hps" class="workflow-panel p-6">
                 <div class="max-w-xl">
@@ -90,6 +91,16 @@ window.renderWorkflow = async function renderWorkflow() {
                     <button type="submit" class="bg-amber-500 text-white px-5 py-2.5 rounded-lg text-sm font-semibold hover:bg-amber-600 flex items-center gap-2"><i data-lucide="calculator" class="w-4 h-4"></i> Hitung Koreksi</button>
                 </form>
                 <div id="workflow-koreksi-table" class="mt-6"></div>
+            </div>
+            <div id="workflow-pa" class="workflow-panel hidden p-6">
+                <div class="max-w-3xl">
+                    <label class="block text-xs font-bold text-slate-500 mb-1.5 uppercase tracking-wide">RAB Menunggu Persetujuan PA</label>
+                    <select id="workflow-pa-pekerjaan" onchange="loadWorkflowPASummary(this.value)" class="w-full border border-slate-300 rounded-lg px-3 py-2.5 text-sm bg-white focus:border-brand outline-none">
+                        <option value="">-- Pilih Pekerjaan --</option>
+                        ${window.workflowData.pekerjaan.filter(p => String(p.status || '').toLowerCase() === 'menunggu pa').map(p => `<option value="${p.id}">${p.nomor_paket || '-'} - ${p.nama_pekerjaan || '-'}</option>`).join('')}
+                    </select>
+                    <div id="workflow-pa-summary" class="mt-5"></div>
+                </div>
             </div>
         </div>
     `;
@@ -262,6 +273,37 @@ window.previewWorkflowKoreksi = function previewWorkflowKoreksi(event) {
         </div>
         <button type="button" onclick="saveWorkflowKoreksi('${pekerjaanId}', ${factor})" class="mt-4 bg-brand text-white px-5 py-2.5 rounded-lg text-sm font-semibold hover:bg-sky-700 flex items-center gap-2"><i data-lucide="save" class="w-4 h-4"></i> Simpan RAB Terkoreksi</button>`;
     lucide.createIcons();
+};
+
+window.loadWorkflowPASummary = function loadWorkflowPASummary(pekerjaanId) {
+    const target = document.getElementById('workflow-pa-summary');
+    if (!target) return;
+    if (!pekerjaanId) {
+        target.innerHTML = '';
+        return;
+    }
+
+    const items = (window.workflowData?.rab || []).filter(item => String(item.pekerjaan_id) === String(pekerjaanId) && String(item.versi_rab || '').toLowerCase() === 'terkoreksi');
+    const total = items.reduce((sum, item) => sum + workflowItemTotal(item), 0);
+    target.innerHTML = `
+        <div class="bg-slate-50 border border-slate-200 rounded-xl p-4">
+            <div class="flex justify-between text-sm"><span class="text-slate-500">Jumlah item RAB terkoreksi</span><strong>${items.length}</strong></div>
+            <div class="flex justify-between text-sm mt-2"><span class="text-slate-500">Nilai RAB kontrak</span><strong class="text-brand">${CONFIG.formatCurrency(total)}</strong></div>
+        </div>
+        <button type="button" onclick="approveWorkflowPA('${pekerjaanId}')" class="mt-4 bg-emerald-600 text-white px-5 py-2.5 rounded-lg text-sm font-semibold hover:bg-emerald-700 flex items-center gap-2"><i data-lucide="check-circle" class="w-4 h-4"></i> Setujui PA dan Teruskan ke Kontrak</button>`;
+    lucide.createIcons();
+};
+
+window.approveWorkflowPA = async function approveWorkflowPA(pekerjaanId) {
+    const result = await fetchAPI('', 'POST', {
+        action: 'update',
+        table: 'Pekerjaan',
+        data: { id: pekerjaanId, status: 'Disetujui PA' }
+    });
+    if (!result) return;
+    invalidateCache('Pekerjaan');
+    showToast('RAB disetujui PA dan siap dibuatkan Kontrak');
+    renderWorkflow();
 };
 
 window.saveWorkflowKoreksi = async function saveWorkflowKoreksi(pekerjaanId, factor) {

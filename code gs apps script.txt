@@ -177,12 +177,13 @@ function simpanRABTerkoreksi(pekerjaan_id, dataKoreksi) {
 
   for (var i = 1; i < pekerjaanData.length; i++) {
     if (String(pekerjaanData[i][idIndex]) === String(pekerjaan_id)) {
-      pekerjaanSheet.getRange(i + 1, statusIndex + 1).setValue('RAB Terkoreksi');
+      pekerjaanSheet.getRange(i + 1, statusIndex + 1).setValue('Menunggu PA');
       return {
         success: true,
         message: 'RAB terkoreksi berhasil disimpan.',
         pekerjaan_id: pekerjaan_id,
         versi_rab: 'Terkoreksi',
+        status_pekerjaan: 'Menunggu PA',
         jumlah_detail: rabRows.length
       };
     }
