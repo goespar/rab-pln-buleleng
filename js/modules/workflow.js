@@ -270,15 +270,70 @@ window.previewWorkflowKoreksi = function previewWorkflowKoreksi(event) {
     const factor = nilaiTender / hps;
     document.getElementById('workflow-koreksi-table').innerHTML = `
         <div class="overflow-x-auto rounded-lg border border-slate-200">
-            <table class="w-full text-sm text-left"><thead class="bg-slate-100 text-slate-600"><tr><th class="p-3">Uraian</th><th class="p-3">Harga HPS</th><th class="p-3">Harga Koreksi</th><th class="p-3">Jumlah Koreksi</th></tr></thead>
+            <table class="w-full text-sm text-left"><thead class="bg-slate-100 text-slate-600"><tr><th class="p-3">Uraian</th><th class="p-3">Volume</th><th class="p-3">Harga HPS</th><th class="p-3">Harga Material Koreksi</th><th class="p-3">Harga Jasa Koreksi</th><th class="p-3">Bagian Material</th><th class="p-3">Bagian Jasa</th><th class="p-3">Jumlah</th></tr></thead>
             <tbody class="divide-y divide-slate-100">${items.map(item => {
-                const hargaHps = Number(item.harga_material || 0) + Number(item.harga_jasa || 0);
-                const hargaKoreksi = hargaHps * factor;
-                return `<tr><td class="p-3">${escapeWorkflowHtml(item.uraian)}</td><td class="p-3">${CONFIG.formatCurrency(hargaHps)}</td><td class="p-3 font-semibold text-brand">${CONFIG.formatCurrency(hargaKoreksi)}</td><td class="p-3 font-bold">${CONFIG.formatCurrency((Number(item.volume) || 0) * hargaKoreksi)}</td></tr>`;
-            }).join('')}</tbody></table>
+                const hargaMaterial = (Number(item.harga_material) || 0) * factor;
+                const hargaJasa = (Number(item.harga_jasa) || 0) * factor;
+                return `<tr data-koreksi-row="${item.id}">
+                    <td class="p-3">${escapeWorkflowHtml(item.uraian)}</td>
+                    <td class="p-3 text-center" data-koreksi-volume="${item.id}">${Number(item.volume) || 0}</td>
+                    <td class="p-3">${CONFIG.formatCurrency((Number(item.harga_material) || 0) + (Number(item.harga_jasa) || 0))}</td>
+                    <td class="p-3"><input data-koreksi-field="harga_material" data-id="${item.id}" type="number" min="0" step="any" value="${hargaMaterial}" oninput="updateWorkflowKoreksiTotals()" class="w-36 border border-slate-300 rounded px-2 py-1 font-semibold text-brand"></td>
+                    <td class="p-3"><input data-koreksi-field="harga_jasa" data-id="${item.id}" type="number" min="0" step="any" value="${hargaJasa}" oninput="updateWorkflowKoreksiTotals()" class="w-36 border border-slate-300 rounded px-2 py-1 font-semibold text-brand"></td>
+                    <td class="p-3 text-right" data-koreksi-result="bagian-material" data-id="${item.id}">Rp 0</td>
+                    <td class="p-3 text-right" data-koreksi-result="bagian-jasa" data-id="${item.id}">Rp 0</td>
+                    <td class="p-3 text-right font-bold" data-koreksi-result="jumlah" data-id="${item.id}">Rp 0</td>
+                </tr>`;
+            }).join('')}</tbody>
+            <tfoot class="bg-slate-50 border-t-2 border-slate-200 font-bold"><tr><td colspan="3" class="p-3 text-right">TOTAL</td><td id="workflow-koreksi-total-harga-material" class="p-3 text-right">Rp 0</td><td id="workflow-koreksi-total-harga-jasa" class="p-3 text-right">Rp 0</td><td id="workflow-koreksi-total-bagian-material" class="p-3 text-right">Rp 0</td><td id="workflow-koreksi-total-bagian-jasa" class="p-3 text-right">Rp 0</td><td id="workflow-koreksi-total-jumlah" class="p-3 text-right text-brand">Rp 0</td></tr></tfoot></table>
         </div>
-        <button type="button" onclick="saveWorkflowKoreksi('${pekerjaanId}', ${factor})" class="mt-4 bg-brand text-white px-5 py-2.5 rounded-lg text-sm font-semibold hover:bg-sky-700 flex items-center gap-2"><i data-lucide="save" class="w-4 h-4"></i> Simpan RAB Terkoreksi</button>`;
+        <button type="button" onclick="saveWorkflowKoreksi('${pekerjaanId}')" class="mt-4 bg-brand text-white px-5 py-2.5 rounded-lg text-sm font-semibold hover:bg-sky-700 flex items-center gap-2"><i data-lucide="save" class="w-4 h-4"></i> Simpan RAB Terkoreksi</button>`;
     lucide.createIcons();
+    updateWorkflowKoreksiTotals();
+};
+
+window.updateWorkflowKoreksiTotals = function updateWorkflowKoreksiTotals() {
+    let totalHargaMaterial = 0;
+    let totalHargaJasa = 0;
+    let totalBagianMaterial = 0;
+    let totalBagianJasa = 0;
+    let totalJumlah = 0;
+
+    document.querySelectorAll('[data-koreksi-row]').forEach(row => {
+        const id = row.dataset.koreksiRow;
+        const volume = Number(document.querySelector(`[data-koreksi-volume="${id}"]`)?.textContent) || 0;
+        const hargaMaterial = Number(row.querySelector('[data-koreksi-field="harga_material"]')?.value) || 0;
+        const hargaJasa = Number(row.querySelector('[data-koreksi-field="harga_jasa"]')?.value) || 0;
+        const bagianMaterial = volume * hargaMaterial;
+        const bagianJasa = volume * hargaJasa;
+        const jumlah = bagianMaterial + bagianJasa;
+
+        totalHargaMaterial += hargaMaterial;
+        totalHargaJasa += hargaJasa;
+        totalBagianMaterial += bagianMaterial;
+        totalBagianJasa += bagianJasa;
+        totalJumlah += jumlah;
+
+        const setResult = (name, value) => {
+            const element = document.querySelector(`[data-koreksi-result="${name}"][data-id="${id}"]`);
+            if (element) element.textContent = CONFIG.formatCurrency(value);
+        };
+        setResult('bagian-material', bagianMaterial);
+        setResult('bagian-jasa', bagianJasa);
+        setResult('jumlah', jumlah);
+    });
+
+    const totals = {
+        'workflow-koreksi-total-harga-material': totalHargaMaterial,
+        'workflow-koreksi-total-harga-jasa': totalHargaJasa,
+        'workflow-koreksi-total-bagian-material': totalBagianMaterial,
+        'workflow-koreksi-total-bagian-jasa': totalBagianJasa,
+        'workflow-koreksi-total-jumlah': totalJumlah
+    };
+    Object.entries(totals).forEach(([id, value]) => {
+        const element = document.getElementById(id);
+        if (element) element.textContent = CONFIG.formatCurrency(value);
+    });
 };
 
 window.loadWorkflowPASummary = function loadWorkflowPASummary(pekerjaanId) {
@@ -319,18 +374,25 @@ window.approveWorkflowPA = async function approveWorkflowPA(pekerjaanId) {
     renderWorkflow();
 };
 
-window.saveWorkflowKoreksi = async function saveWorkflowKoreksi(pekerjaanId, factor) {
+window.saveWorkflowKoreksi = async function saveWorkflowKoreksi(pekerjaanId) {
     const items = getWorkflowHPSItems(pekerjaanId);
-    const dataKoreksi = items.map(item => ({
-        ...item,
-        id: undefined,
-        versi_rab: 'Terkoreksi',
-        harga_material: (Number(item.harga_material) || 0) * factor,
-        harga_jasa: (Number(item.harga_jasa) || 0) * factor,
-        bagian_material: (Number(item.volume) || 0) * (Number(item.harga_material) || 0) * factor,
-        bagian_jasa: (Number(item.volume) || 0) * (Number(item.harga_jasa) || 0) * factor,
-        jumlah: workflowItemTotal(item) * factor
-    }));
+    const dataKoreksi = items.map(item => {
+        const materialInput = document.querySelector(`[data-koreksi-field="harga_material"][data-id="${item.id}"]`);
+        const jasaInput = document.querySelector(`[data-koreksi-field="harga_jasa"][data-id="${item.id}"]`);
+        const hargaMaterial = Number(materialInput?.value) || 0;
+        const hargaJasa = Number(jasaInput?.value) || 0;
+        const volume = Number(item.volume) || 0;
+        return {
+            ...item,
+            id: undefined,
+            versi_rab: 'Terkoreksi',
+            harga_material: hargaMaterial,
+            harga_jasa: hargaJasa,
+            bagian_material: volume * hargaMaterial,
+            bagian_jasa: volume * hargaJasa,
+            jumlah: volume * (hargaMaterial + hargaJasa)
+        };
+    });
 
     const result = await fetchAPI('', 'POST', {
         action: 'simpanRABTerkoreksi',
