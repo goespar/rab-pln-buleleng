@@ -49,14 +49,27 @@ window.renderDashboard = async function renderDashboard(filters = {}) {
     // KPI
     let totalNilaiKontrak = 0;
     kontrakArr.forEach(k => { totalNilaiKontrak += parseFloat(k.nilai_kontrak) || 0; });
+    const pengadaanIdsTerpilih = new Set(
+        pekerjaanArr
+            .map(p => p.pengadaan_id || p.id_pengadaan_prk)
+            .filter(Boolean)
+            .map(id => String(id))
+    );
     let totalPaguPengadaan = 0;
-    pengadaanArr.forEach(p => { totalPaguPengadaan += parseFloat(p.nilai_pagu) || 0; });
+    pengadaanArr.forEach(p => {
+        if (pengadaanIdsTerpilih.size === 0 || pengadaanIdsTerpilih.has(String(p.id))) {
+            totalPaguPengadaan += parseFloat(p.nilai_pagu) || 0;
+        }
+    });
     let totalRealisasi = data && data.realisasi ? parseFloat(data.realisasi) : 0;
     if (totalRealisasi === 0) realisasiArr.forEach(r => { totalRealisasi += parseFloat(r.nilai) || parseFloat(r.nilai_realisasi) || 0; });
 
     const totalAnggaran      = totalPaguPengadaan > 0 ? totalPaguPengadaan : totalNilaiKontrak;
     const sisaAnggaran       = totalAnggaran > totalRealisasi ? totalAnggaran - totalRealisasi : 0;
     const persentaseRealisasi= totalAnggaran > 0 ? ((totalRealisasi / totalAnggaran) * 100).toFixed(1) : '0';
+    const nilaiEfisiensi     = totalAnggaran - totalNilaiKontrak;
+    const persentaseEfisiensi= totalAnggaran > 0 ? ((nilaiEfisiensi / totalAnggaran) * 100).toFixed(1) : '0';
+    const persentaseSerapan  = totalNilaiKontrak > 0 ? ((totalRealisasi / totalNilaiKontrak) * 100).toFixed(1) : '0';
     const totalPaket         = pekerjaanArr.length;
 
     // Realisasi kumulatif bulanan
@@ -247,6 +260,17 @@ window.renderDashboard = async function renderDashboard(filters = {}) {
                     </div>
                 </div>
                 <div class="space-y-1.5 text-xs pt-2 border-t border-slate-100">${komposisiHTML}</div>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+            <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-100">
+                <div class="flex items-center justify-between mb-3"><h3 class="text-sm font-bold text-slate-800">Rekap Efisiensi Anggaran</h3><i data-lucide="badge-percent" class="w-5 h-5 text-blue-500"></i></div>
+                <div class="grid grid-cols-3 gap-3 text-xs"><div><p class="text-slate-500">Pagu</p><p class="font-bold text-slate-800 mt-1">${formatShortCurrency(totalAnggaran)}</p></div><div><p class="text-slate-500">Kontrak</p><p class="font-bold text-brand mt-1">${formatShortCurrency(totalNilaiKontrak)}</p></div><div><p class="text-slate-500">Efisiensi</p><p class="font-bold ${nilaiEfisiensi >= 0 ? 'text-emerald-600' : 'text-red-600'} mt-1">${formatShortCurrency(nilaiEfisiensi)} (${persentaseEfisiensi}%)</p></div></div>
+            </div>
+            <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-100">
+                <div class="flex items-center justify-between mb-3"><h3 class="text-sm font-bold text-slate-800">Rekap Serapan Anggaran</h3><i data-lucide="pie-chart" class="w-5 h-5 text-emerald-500"></i></div>
+                <div class="grid grid-cols-3 gap-3 text-xs"><div><p class="text-slate-500">Kontrak</p><p class="font-bold text-slate-800 mt-1">${formatShortCurrency(totalNilaiKontrak)}</p></div><div><p class="text-slate-500">Realisasi</p><p class="font-bold text-emerald-600 mt-1">${formatShortCurrency(totalRealisasi)}</p></div><div><p class="text-slate-500">Serapan</p><p class="font-bold text-brand mt-1">${persentaseSerapan}%</p></div></div>
             </div>
         </div>
 
