@@ -134,8 +134,9 @@ async function loadPekerjaanData() {
                 tombolWorkflow = `<button onclick="handlePekerjaanAction('tender', '${p.id}')" class="text-emerald-600 hover:text-emerald-800 text-[10px] font-semibold">Tender</button>`;
             } else if (statusPekerjaan === 'tender selesai') {
                 tombolWorkflow = `<button onclick="handlePekerjaanAction('koreksi-rab', '${p.id}')" class="text-amber-600 hover:text-amber-800 text-[10px] font-semibold">Koreksi RAB</button>`;
-            } else if (statusPekerjaan === 'menunggu pa') {
-                tombolWorkflow = `<button onclick="handlePekerjaanAction('review-pa', '${p.id}')" class="text-amber-600 hover:text-amber-800 text-[10px] font-semibold">Review PA</button>`;
+            } else if (statusPekerjaan === 'menunggu pa' || statusPekerjaan === 'rab terkoreksi') {
+                const actionLabel = statusPekerjaan === 'rab terkoreksi' ? 'Kirim ke PA' : 'Review PA';
+                tombolWorkflow = `<button onclick="handlePekerjaanAction('review-pa', '${p.id}')" class="text-amber-600 hover:text-amber-800 text-[10px] font-semibold">${actionLabel}</button>`;
             } else if (statusPekerjaan === 'disetujui pa') {
                 tombolWorkflow = `<button onclick="handlePekerjaanAction('buat-kontrak', '${p.id}')" class="text-brand hover:text-sky-700 text-[10px] font-semibold">Buat Kontrak</button>`;
             }
@@ -162,12 +163,19 @@ async function loadPekerjaanData() {
     lucide.createIcons();
 }
 
-window.handlePekerjaanAction = function handlePekerjaanAction(action, pekerjaanId) {
+window.handlePekerjaanAction = async function handlePekerjaanAction(action, pekerjaanId) {
     if (action === 'tender') {
         showToast(`Pekerjaan ${pekerjaanId} siap diproses ke Tender`, 'info');
     } else if (action === 'koreksi-rab') {
         showToast(`Pekerjaan ${pekerjaanId} siap diproses ke Koreksi RAB`, 'info');
     } else if (action === 'review-pa') {
+        const pekerjaanList = await fetchWithCache('Pekerjaan');
+        const pekerjaan = (pekerjaanList || []).find(item => String(item.id) === String(pekerjaanId));
+        if (String(pekerjaan?.status || '').toLowerCase() === 'rab terkoreksi') {
+            const result = await fetchAPI('', 'POST', { action: 'update', table: 'Pekerjaan', data: { id: pekerjaanId, status: 'Menunggu PA' } });
+            if (!result) return;
+            invalidateCache('Pekerjaan');
+        }
         navigate('workflow');
         setTimeout(() => {
             switchWorkflowTab('pa');

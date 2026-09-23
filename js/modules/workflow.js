@@ -97,7 +97,7 @@ window.renderWorkflow = async function renderWorkflow() {
                     <label class="block text-xs font-bold text-slate-500 mb-1.5 uppercase tracking-wide">RAB Menunggu Persetujuan PA</label>
                     <select id="workflow-pa-pekerjaan" onchange="loadWorkflowPASummary(this.value)" class="w-full border border-slate-300 rounded-lg px-3 py-2.5 text-sm bg-white focus:border-brand outline-none">
                         <option value="">-- Pilih Pekerjaan --</option>
-                        ${window.workflowData.pekerjaan.filter(p => String(p.status || '').toLowerCase() === 'menunggu pa').map(p => `<option value="${p.id}">${p.nomor_paket || '-'} - ${p.nama_pekerjaan || '-'}</option>`).join('')}
+                        ${window.workflowData.pekerjaan.filter(p => ['menunggu pa', 'rab terkoreksi'].includes(String(p.status || '').toLowerCase())).map(p => `<option value="${p.id}">${p.nomor_paket || '-'} - ${p.nama_pekerjaan || '-'} (${String(p.status || 'Menunggu PA')})</option>`).join('')}
                     </select>
                     <div id="workflow-pa-summary" class="mt-5"></div>
                 </div>
