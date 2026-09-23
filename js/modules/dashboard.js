@@ -186,20 +186,58 @@ window.renderDashboard = async function renderDashboard(filters = {}) {
         const tahunLabel = sifat === 'Murni' ? tahunDashboard : tahunDashboard - 1;
         return `<div class="border border-slate-300 rounded-lg p-3 ${sifat === 'Murni' ? 'bg-emerald-50' : 'bg-amber-50'}"><div class="font-bold text-center uppercase text-xs mb-2">${sifat}</div><div class="text-center"><span class="text-slate-500 text-[10px]">TOTAL DANA TAHUN ${tahunLabel}</span><strong class="block mt-1 text-lg">${formatShortCurrency(totalDana)}</strong></div></div>`;
     }).join('');
-    const dashboardPrkMarkup = dashboardPrkCards.length ? dashboardPrkCards.map((card, index) => `
+    // KESELURUHAN ANGGARAN INVESTASI card
+    const totalDanaMurni = dashboardSifatSummary['Murni'] || 0;
+    const totalDanaLanjutan = dashboardSifatSummary['Lanjutan'] || 0;
+    
+    const keseluruhanMarkup = `
+        <div class="bg-white border border-slate-300 rounded-lg overflow-hidden">
+            <div class="bg-yellow-300 text-slate-900 text-center font-bold text-xs p-2 uppercase">KESELURUHAN ANGGARAN INVESTASI</div>
+            <div class="p-4 grid grid-cols-5 gap-3 text-center text-xs">
+                <div>
+                    <span class="text-slate-500 block mb-2">SELURUH DANA</span>
+                    <strong class="block text-base text-slate-800">${formatShortCurrency(totalDashboardPagu)}</strong>
+                </div>
+                <div>
+                    <span class="text-slate-500 block mb-2">MURNI</span>
+                    <strong class="block text-base text-slate-800">${formatShortCurrency(totalDanaMurni)}</strong>
+                </div>
+                <div>
+                    <span class="text-slate-500 block mb-2">LANJUTAN</span>
+                    <strong class="block text-base text-slate-800">${formatShortCurrency(totalDanaLanjutan)}</strong>
+                </div>
+                <div>
+                    <span class="text-slate-500 block mb-2">KONTRAK</span>
+                    <strong class="block text-base text-brand">${formatShortCurrency(totalDashboardKontrak)}</strong>
+                </div>
+                <div>
+                    <span class="text-slate-500 block mb-2">SISA</span>
+                    <strong class="block text-base text-amber-700">${formatShortCurrency(totalDashboardSisa)}</strong>
+                </div>
+            </div>
+        </div>`;
+
+    const dashboardPrkMarkup = dashboardPrkCards.length ? dashboardPrkCards.map((card, index) => {
+        const pctRab = card.pagu > 0 ? ((card.rab / card.pagu) * 100).toFixed(1) : '0';
+        const pctKontrak = card.pagu > 0 ? ((card.kontrak / card.pagu) * 100).toFixed(1) : '0';
+        const pctSisa = card.pagu > 0 ? ((card.sisa / card.pagu) * 100).toFixed(1) : '0';
+        const pctBayar = card.kontrak > 0 ? ((card.bayar / card.kontrak) * 100).toFixed(1) : '0';
+        const pctBelumBayar = card.kontrak > 0 ? ((card.belumBayar / card.kontrak) * 100).toFixed(1) : '0';
+        return `
         <div class="bg-white border border-slate-300 rounded-lg overflow-hidden">
             <div class="bg-cyan-400 text-slate-900 text-center font-bold text-xs p-2 uppercase">KODE PROGRAM: ${escapeDashboardText(card.no)} - ${escapeDashboardText(card.name)}</div>
             <div class="p-3 grid grid-cols-[100px_1fr] gap-3 items-center">
                 <div class="relative h-24"><canvas id="dashboard-prk-chart-${index}"></canvas></div>
                 <div class="grid grid-cols-2 gap-2 text-[10px]">
-                    <div><span class="text-slate-500">RAB</span><strong class="block">${formatShortCurrency(card.rab)}</strong></div>
-                    <div><span class="text-slate-500">KONTRAK</span><strong class="block">${formatShortCurrency(card.kontrak)}</strong></div>
-                    <div><span class="text-slate-500">SISA PRK</span><strong class="block text-amber-700">${formatShortCurrency(card.sisa)}</strong></div>
-                    <div><span class="text-slate-500">TERBAYAR</span><strong class="block text-emerald-700">${formatShortCurrency(card.bayar)}</strong></div>
-                    <div class="col-span-2"><span class="text-slate-500">BELUM TERBAYAR</span><strong class="block text-rose-700">${formatShortCurrency(card.belumBayar)}</strong></div>
+                    <div><span class="text-slate-500">RAB</span><strong class="block">${formatShortCurrency(card.rab)}</strong><small class="text-slate-400">${pctRab}%</small></div>
+                    <div><span class="text-slate-500">KONTRAK</span><strong class="block">${formatShortCurrency(card.kontrak)}</strong><small class="text-slate-400">${pctKontrak}%</small></div>
+                    <div><span class="text-slate-500">SISA PRK</span><strong class="block text-amber-700">${formatShortCurrency(card.sisa)}</strong><small class="text-slate-400">${pctSisa}%</small></div>
+                    <div><span class="text-slate-500">TERBAYAR</span><strong class="block text-emerald-700">${formatShortCurrency(card.bayar)}</strong><small class="text-slate-400">${pctBayar}%</small></div>
+                    <div class="col-span-2"><span class="text-slate-500">BELUM TERBAYAR</span><strong class="block text-rose-700">${formatShortCurrency(card.belumBayar)}</strong><small class="text-slate-400">${pctBelumBayar}%</small></div>
                 </div>
             </div>
-        </div>`).join('') : '<div class="p-6 text-center text-slate-400">Belum ada data PRK.</div>';
+        </div>`;
+    }).join('') : '<div class="p-6 text-center text-slate-400">Belum ada data PRK.</div>';
 
     const rekapDisburseRows = pengadaanArr.map(pengadaan => {
         const pengadaanId = String(pengadaan.id);
@@ -253,20 +291,7 @@ window.renderDashboard = async function renderDashboard(filters = {}) {
     contentArea.innerHTML = `
         <div class="bg-white border border-slate-200 rounded-xl p-5 mb-6 shadow-sm">
             <div class="flex justify-between items-center mb-4"><div><h2 class="text-lg font-bold text-slate-800">DASHBOARD AI ${new Date().getFullYear()}</h2><p class="text-xs text-slate-500">Rekap Anggaran Investasi per Kode Program</p></div><i data-lucide="bar-chart-3" class="w-6 h-6 text-brand"></i></div>
-            <div class="border border-slate-300 rounded-lg overflow-hidden mb-5">
-                <div class="bg-cyan-400 text-center text-slate-900 font-bold text-sm p-2 uppercase">KESELURUHAN DANA INVESTASI</div>
-                <div class="p-4 grid grid-cols-1 md:grid-cols-[130px_1fr] gap-4 items-center">
-                    <div class="relative h-28"><canvas id="dashboard-total-chart"></canvas></div>
-                    <div class="grid grid-cols-2 sm:grid-cols-5 gap-3 text-xs">
-                        <div><span class="text-slate-500">ANGGARAN INVESTASI</span><strong class="block mt-1">${formatShortCurrency(totalDashboardPagu)}</strong></div>
-                        <div><span class="text-slate-500">TOTAL KONTRAK</span><strong class="block mt-1">${formatShortCurrency(totalDashboardKontrak)}</strong><small class="text-slate-400">${totalDashboardPagu > 0 ? ((totalDashboardKontrak / totalDashboardPagu) * 100).toFixed(1) : '0'}%</small></div>
-                        <div><span class="text-slate-500">SISA PRK</span><strong class="block mt-1 text-amber-700">${formatShortCurrency(totalDashboardSisa)}</strong></div>
-                        <div><span class="text-slate-500">TERBAYAR</span><strong class="block mt-1 text-emerald-700">${formatShortCurrency(totalDashboardBayar)}</strong><small class="text-slate-400">${totalDashboardKontrak > 0 ? ((totalDashboardBayar / totalDashboardKontrak) * 100).toFixed(1) : '0'}%</small></div>
-                        <div><span class="text-slate-500">BELUM TERBAYAR</span><strong class="block mt-1 text-rose-700">${formatShortCurrency(totalDashboardKontrak - totalDashboardBayar)}</strong></div>
-                    </div>
-                </div>
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-3 mt-3">${dashboardSifatMarkup}</div>
-            </div>
+
             <div class="grid grid-cols-2 md:grid-cols-5 gap-3 mb-5 text-xs">
                 <div class="bg-slate-50 border rounded-lg p-3"><span class="text-slate-500">ANGGARAN INVESTASI</span><strong class="block mt-1">${formatShortCurrency(totalDashboardPagu)}</strong></div>
                 <div class="bg-slate-50 border rounded-lg p-3"><span class="text-slate-500">TOTAL RAB</span><strong class="block mt-1">${formatShortCurrency(dashboardPrkCards.reduce((sum, card) => sum + card.rab, 0))}</strong></div>
@@ -274,6 +299,7 @@ window.renderDashboard = async function renderDashboard(filters = {}) {
                 <div class="bg-slate-50 border rounded-lg p-3"><span class="text-slate-500">TERBAYAR</span><strong class="block mt-1 text-emerald-700">${formatShortCurrency(totalDashboardBayar)}</strong></div>
                 <div class="bg-slate-50 border rounded-lg p-3"><span class="text-slate-500">SISA PRK</span><strong class="block mt-1 text-amber-700">${formatShortCurrency(totalDashboardSisa)}</strong></div>
             </div>
+            <div class="grid grid-cols-1 gap-4 mb-5">${keseluruhanMarkup}</div>
             <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">${dashboardPrkMarkup}</div>
         </div>
         <!-- FILTER -->
@@ -481,12 +507,11 @@ window.renderDashboard = async function renderDashboard(filters = {}) {
     if (document.getElementById('dash-filter-status')) document.getElementById('dash-filter-status').value = filterStatus;
 
     initDashboardCharts(realisasiKumulatif, rencanaKumulatif, realisasiPerBulan, komposisiLabels, komposisiValues, statusCounts);
+    
     dashboardPrkCards.forEach((card, index) => {
         const chart = document.getElementById(`dashboard-prk-chart-${index}`);
         if (chart) new Chart(chart, { type: 'doughnut', data: { labels: ['Kontrak', 'Sisa PRK'], datasets: [{ data: [Math.max(card.kontrak, 0), Math.max(card.pagu - card.kontrak, 0)], backgroundColor: ['#3b82f6', '#d1d5db'], borderWidth: 0 }] }, options: { responsive: true, maintainAspectRatio: false, cutout: '62%', plugins: { legend: { display: false } } } });
     });
-    const totalChart = document.getElementById('dashboard-total-chart');
-    if (totalChart) new Chart(totalChart, { type: 'doughnut', data: { labels: ['Kontrak', 'Sisa PRK'], datasets: [{ data: [Math.max(totalDashboardKontrak, 0), Math.max(totalDashboardSisa, 0)], backgroundColor: ['#3b82f6', '#d1d5db'], borderWidth: 0 }] }, options: { responsive: true, maintainAspectRatio: false, cutout: '64%', plugins: { legend: { display: false } } } });
 }
 
 function escapeDashboardText(value) {
