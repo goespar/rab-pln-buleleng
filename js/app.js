@@ -25,6 +25,7 @@ const state = {
     dataCache: {
         'Pekerjaan':     { data: null, timestamp: null },
         'RAB':           { data: null, timestamp: null },
+        'Tender':        { data: null, timestamp: null },
         'Pengadaan':     { data: null, timestamp: null },
         'Tahun':         { data: null, timestamp: null },
         'prk':           { data: null, timestamp: null },

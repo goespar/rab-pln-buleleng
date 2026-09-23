@@ -46,6 +46,7 @@ function navigate(page) {
         'dashboard'  : 'Dashboard',
         'prk'        : 'Program Rencana Kerja (PRK)',
         'rab'        : 'INPUT RAB',
+        'workflow'   : 'Tender & Koreksi RAB',
         'rekap'      : 'Rekap RAB Komponen',
         'rekaprabpengadaan' : 'Rekap RAB Pengadaan',
         'realisasi'  : 'Data Realisasi',
@@ -79,6 +80,7 @@ function navigate(page) {
         case 'dashboard'  : renderDashboard();  break;
         case 'prk'        : renderPRK();         break;
         case 'rab'        : renderRAB();         break;
+        case 'workflow'   : renderWorkflow();    break;
         case 'rekap'      : renderRekap();       break;
         case 'rekaprabpengadaan' : renderRekapRabPengadaan(); break;
         case 'realisasi'  : renderRealisasi();   break;

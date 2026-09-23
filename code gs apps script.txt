@@ -24,6 +24,18 @@ function doPost(e) {
     var action = payload.action;
     var table = payload.table;
     var rowData = payload.data || {};
+
+    if (action === 'simpanRABTerkoreksi') {
+      return createJsonResponse(
+        simpanRABTerkoreksi(payload.pekerjaan_id, payload.dataKoreksi)
+      );
+    }
+
+    if (action === 'cekLimitRealisasi') {
+      return createJsonResponse(
+        cekLimitRealisasi(payload.pekerjaan_id, payload.nilai_termin_baru)
+      );
+    }
     
     var ss = SpreadsheetApp.getActiveSpreadsheet();
     var sheet = ss.getSheetByName(table);
@@ -117,6 +129,158 @@ function getTableData(tableName) {
     if (!rowEmpty) result.push(obj);
   }
   return result;
+}
+
+function simpanRABTerkoreksi(pekerjaan_id, dataKoreksi) {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var rabSheet = ss.getSheetByName('RAB');
+  var pekerjaanSheet = ss.getSheetByName('Pekerjaan');
+
+  if (!rabSheet) throw new Error("Sheet 'RAB' tidak ditemukan.");
+  if (!pekerjaanSheet) throw new Error("Sheet 'Pekerjaan' tidak ditemukan.");
+  if (!pekerjaan_id) throw new Error('pekerjaan_id wajib diisi.');
+  if (!Array.isArray(dataKoreksi) || dataKoreksi.length === 0) {
+    throw new Error('Data koreksi RAB tidak boleh kosong.');
+  }
+
+  var rabHeaders = getHeaders(rabSheet);
+  var rabRows = dataKoreksi.map(function (item) {
+    var rowData = {};
+    Object.keys(item || {}).forEach(function (key) {
+      rowData[String(key).toLowerCase().trim()] = item[key];
+    });
+
+    rowData.pekerjaan_id = pekerjaan_id;
+    rowData.versi_rab = 'Terkoreksi';
+    if (rowData.created_at === undefined) rowData.created_at = new Date();
+
+    return rabHeaders.map(function (header) {
+      var headerName = String(header).toLowerCase().trim();
+      return rowData[headerName] !== undefined ? rowData[headerName] : '';
+    });
+  });
+
+  rabSheet.getRange(
+    rabSheet.getLastRow() + 1,
+    1,
+    rabRows.length,
+    rabHeaders.length
+  ).setValues(rabRows);
+
+  var pekerjaanData = pekerjaanSheet.getDataRange().getValues();
+  var pekerjaanHeaders = pekerjaanData[0];
+  var idIndex = cariIndexKolom(pekerjaanHeaders, ['pekerjaan_id', 'id']);
+  var statusIndex = cariIndexKolom(pekerjaanHeaders, ['status']);
+
+  if (idIndex === -1) throw new Error("Kolom 'pekerjaan_id' atau 'id' tidak ditemukan.");
+  if (statusIndex === -1) throw new Error("Kolom 'status' tidak ditemukan.");
+
+  for (var i = 1; i < pekerjaanData.length; i++) {
+    if (String(pekerjaanData[i][idIndex]) === String(pekerjaan_id)) {
+      pekerjaanSheet.getRange(i + 1, statusIndex + 1).setValue('RAB Terkoreksi');
+      return {
+        success: true,
+        message: 'RAB terkoreksi berhasil disimpan.',
+        pekerjaan_id: pekerjaan_id,
+        versi_rab: 'Terkoreksi',
+        jumlah_detail: rabRows.length
+      };
+    }
+  }
+
+  throw new Error('Pekerjaan dengan ID tersebut tidak ditemukan.');
+}
+
+function cekLimitRealisasi(pekerjaan_id, nilai_termin_baru) {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var kontrakSheet = ss.getSheetByName('Kontrak');
+  var realisasiSheet = ss.getSheetByName('Realisasi');
+
+  if (!kontrakSheet) throw new Error("Sheet 'Kontrak' tidak ditemukan.");
+  if (!realisasiSheet) throw new Error("Sheet 'Realisasi' tidak ditemukan.");
+  if (!pekerjaan_id) throw new Error('pekerjaan_id wajib diisi.');
+
+  var nilaiTerminBaru = parseNilaiAngka(nilai_termin_baru);
+  if (nilaiTerminBaru < 0) throw new Error('Nilai termin baru tidak boleh negatif.');
+
+  var kontrakData = kontrakSheet.getDataRange().getValues();
+  var kontrakHeaders = kontrakData[0];
+  var kontrakIdIndex = cariIndexKolom(kontrakHeaders, ['pekerjaan_id', 'id_pekerjaan']);
+  var nilaiKontrakIndex = cariIndexKolom(kontrakHeaders, ['nilai_kontrak', 'total_kontrak']);
+
+  if (kontrakIdIndex === -1 || nilaiKontrakIndex === -1) {
+    throw new Error("Kolom 'pekerjaan_id' atau 'nilai_kontrak' tidak ditemukan di sheet Kontrak.");
+  }
+
+  var nilaiKontrak = 0;
+  for (var i = 1; i < kontrakData.length; i++) {
+    if (String(kontrakData[i][kontrakIdIndex]) === String(pekerjaan_id)) {
+      nilaiKontrak += parseNilaiAngka(kontrakData[i][nilaiKontrakIndex]);
+    }
+  }
+  if (nilaiKontrak <= 0) throw new Error('Kontrak tidak ditemukan atau nilai kontrak tidak valid.');
+
+  var realisasiData = realisasiSheet.getDataRange().getValues();
+  var realisasiHeaders = realisasiData[0];
+  var realisasiIdIndex = cariIndexKolom(realisasiHeaders, ['pekerjaan_id', 'id_pekerjaan']);
+  var nilaiRealisasiIndex = cariIndexKolom(realisasiHeaders, ['nilai_termin', 'nilai_realisasi', 'nilai']);
+
+  if (realisasiIdIndex === -1 || nilaiRealisasiIndex === -1) {
+    throw new Error("Kolom 'pekerjaan_id' atau nilai realisasi tidak ditemukan di sheet Realisasi.");
+  }
+
+  var totalRealisasiSebelumnya = 0;
+  for (var j = 1; j < realisasiData.length; j++) {
+    if (String(realisasiData[j][realisasiIdIndex]) === String(pekerjaan_id)) {
+      totalRealisasiSebelumnya += parseNilaiAngka(realisasiData[j][nilaiRealisasiIndex]);
+    }
+  }
+
+  var totalSetelahTermin = totalRealisasiSebelumnya + nilaiTerminBaru;
+  if (totalSetelahTermin > nilaiKontrak) {
+    return {
+      success: false,
+      error: true,
+      message: 'Nilai realisasi melebihi nilai kontrak.',
+      nilai_kontrak: nilaiKontrak,
+      total_realisasi_sebelumnya: totalRealisasiSebelumnya,
+      nilai_termin_baru: nilaiTerminBaru,
+      total_setelah_termin: totalSetelahTermin,
+      sisa_kontrak: nilaiKontrak - totalRealisasiSebelumnya
+    };
+  }
+
+  return {
+    success: true,
+    error: false,
+    message: 'Nilai realisasi masih dalam batas kontrak.',
+    nilai_kontrak: nilaiKontrak,
+    total_realisasi_sebelumnya: totalRealisasiSebelumnya,
+    nilai_termin_baru: nilaiTerminBaru,
+    total_setelah_termin: totalSetelahTermin,
+    sisa_kontrak: nilaiKontrak - totalSetelahTermin
+  };
+}
+
+function cariIndexKolom(headers, namaKolom) {
+  return headers.findIndex(function (header) {
+    return namaKolom.indexOf(String(header).toLowerCase().trim()) !== -1;
+  });
+}
+
+function parseNilaiAngka(nilai) {
+  if (typeof nilai === 'number') return nilai;
+  if (nilai === null || nilai === undefined || nilai === '') return 0;
+
+  var teks = String(nilai).replace(/\s/g, '').replace(/Rp/gi, '');
+  if (teks.indexOf(',') !== -1) {
+    teks = teks.replace(/\./g, '').replace(',', '.');
+  } else {
+    teks = teks.replace(/\./g, '');
+  }
+
+  var angka = Number(teks);
+  return isNaN(angka) ? 0 : angka;
 }
 
 function createJsonResponse(responseObject) {

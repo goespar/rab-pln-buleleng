@@ -127,6 +127,17 @@ async function loadPekerjaanData() {
             const teganganBadge = p.jenis_tegangan
                 ? `<span class="px-1.5 py-0.5 rounded text-[10px] font-bold ${p.jenis_tegangan === 'JTM' ? 'bg-purple-100 text-purple-700' : 'bg-orange-100 text-orange-700'}">${p.jenis_tegangan}</span>`
                 : '';
+            const statusPekerjaan = String(p.status || '').trim().toLowerCase();
+            let tombolWorkflow = '';
+
+            if (statusPekerjaan === 'draft') {
+                tombolWorkflow = `<button onclick="handlePekerjaanAction('tender', '${p.id}')" class="text-emerald-600 hover:text-emerald-800 text-[10px] font-semibold">Tender</button>`;
+            } else if (statusPekerjaan === 'tender selesai') {
+                tombolWorkflow = `<button onclick="handlePekerjaanAction('koreksi-rab', '${p.id}')" class="text-amber-600 hover:text-amber-800 text-[10px] font-semibold">Koreksi RAB</button>`;
+            } else if (statusPekerjaan === 'rab terkoreksi') {
+                tombolWorkflow = `<button onclick="handlePekerjaanAction('buat-kontrak', '${p.id}')" class="text-brand hover:text-sky-700 text-[10px] font-semibold">Buat Kontrak</button>`;
+            }
+
             html += `
                 <tr class="hover:bg-slate-50 transition-colors">
                     <td class="p-3 text-center text-slate-500">${i + 1}</td>
@@ -136,6 +147,7 @@ async function loadPekerjaanData() {
                     <td class="p-3 text-slate-600">${p.lokasi || '-'}</td>
                     <td class="p-3 text-center font-semibold">${p.tahun_anggaran || '-'}</td>
                     <td class="p-3 text-center flex justify-center gap-2">
+                        ${tombolWorkflow}
                         <button onclick="editPekerjaan('${p.id}')" class="text-blue-500 hover:text-blue-700 p-1"><i data-lucide="edit" class="w-4 h-4"></i></button>
                         <button onclick="deleteData('Pekerjaan', '${p.id}', loadPekerjaanData)" class="text-red-400 hover:text-red-600 p-1"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
                     </td>
@@ -147,6 +159,16 @@ async function loadPekerjaanData() {
     container.innerHTML = html;
     lucide.createIcons();
 }
+
+window.handlePekerjaanAction = function handlePekerjaanAction(action, pekerjaanId) {
+    if (action === 'tender') {
+        showToast(`Pekerjaan ${pekerjaanId} siap diproses ke Tender`, 'info');
+    } else if (action === 'koreksi-rab') {
+        showToast(`Pekerjaan ${pekerjaanId} siap diproses ke Koreksi RAB`, 'info');
+    } else if (action === 'buat-kontrak') {
+        showToast(`Pekerjaan ${pekerjaanId} siap diproses ke Kontrak`, 'info');
+    }
+};
 
 function showModalPekerjaan(isEdit = false) {
     if (!isEdit) {
