@@ -63,7 +63,7 @@ window.renderRealisasi = async function renderRealisasi() {
                         <div class="grid grid-cols-2 gap-4">
                             <div>
                                 <label class="block text-sm font-medium text-slate-700 mb-1">Nomor Termin</label>
-                                <input type="number" min="1" id="realisasi-termin" required class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:border-emerald-500 outline-none">
+                                <input type="number" min="1" id="realisasi-termin-ke" required class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:border-emerald-500 outline-none">
                             </div>
                             <div>
                                 <label class="block text-sm font-medium text-slate-700 mb-1">Nilai Terserap (Rp)</label>
@@ -72,6 +72,14 @@ window.renderRealisasi = async function renderRealisasi() {
                             <div>
                                 <label class="block text-sm font-medium text-slate-700 mb-1">Progress Fisik (%)</label>
                                 <input type="number" step="0.01" max="100" id="realisasi-progress" required class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:border-emerald-500 outline-none">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-slate-700 mb-1">Status Pembayaran</label>
+                                <select id="realisasi-status-pembayaran" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:border-emerald-500 outline-none bg-white">
+                                    <option value="Belum Dibayar">Belum Dibayar</option>
+                                    <option value="Diproses">Diproses</option>
+                                    <option value="Dibayar">Dibayar</option>
+                                </select>
                             </div>
                         </div>
                         <div>
@@ -161,7 +169,7 @@ async function loadRealisasiData(pekerjaanId) {
         rows += `
             <tr class="hover:bg-slate-50 transition-colors">
                 <td class="px-4 py-3 text-center text-slate-500">${i + 1}</td>
-                <td class="px-4 py-3 text-center font-semibold text-brand">${r.termin || i + 1}</td>
+                <td class="px-4 py-3 text-center font-semibold text-brand">${r.termin_ke || r.termin || i + 1}</td>
                 <td class="px-4 py-3 font-medium">${CONFIG.formatDate(r.tanggal)}</td>
                 <td class="px-4 py-3 text-right font-semibold text-emerald-600">${CONFIG.formatCurrency(nilai)}</td>
                 <td class="px-4 py-3 text-center">
@@ -173,6 +181,7 @@ async function loadRealisasiData(pekerjaanId) {
                     </div>
                 </td>
                 <td class="px-4 py-3 text-slate-500 text-xs">${r.keterangan || '-'}</td>
+                <td class="px-4 py-3 text-center text-xs">${r.status_pembayaran || 'Belum Dibayar'}</td>
                 <td class="px-4 py-3 text-center flex justify-center gap-2">
                     <button onclick="editRealisasi('${r.id}')" class="text-blue-500 hover:text-blue-700 p-1"><i data-lucide="edit" class="w-4 h-4"></i></button>
                     <button onclick="deleteRealisasi('${r.id}')" class="text-red-400 hover:text-red-600 p-1"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
@@ -191,6 +200,7 @@ async function loadRealisasiData(pekerjaanId) {
                         <th class="px-4 py-3 text-right">Nilai Terserap (Rp)</th>
                         <th class="px-4 py-3 text-center">Progress Fisik</th>
                         <th class="px-4 py-3">Keterangan</th>
+                        <th class="px-4 py-3 text-center">Status Pembayaran</th>
                         <th class="px-4 py-3 text-center w-20">Aksi</th>
                     </tr>
                 </thead>
@@ -200,7 +210,7 @@ async function loadRealisasiData(pekerjaanId) {
                         <td colspan="3" class="px-4 py-3 text-right">TOTAL KUMULATIF</td>
                         <td class="px-4 py-3 text-right text-emerald-600">${CONFIG.formatCurrency(totalNilai)}</td>
                         <td class="px-4 py-3 text-center text-brand">${totalProgress.toFixed(1)}%</td>
-                        <td colspan="2"></td>
+                        <td colspan="3"></td>
                     </tr>
                 </tfoot>
             </table>
@@ -212,10 +222,11 @@ function showModalRealisasi() {
     const modal = document.getElementById('modal-realisasi');
     if (!modal) return;
     state.editingRealisasiId = null;
-    document.getElementById('realisasi-termin').value = window.realisasiTerminBerikutnya || 1;
+    document.getElementById('realisasi-termin-ke').value = window.realisasiTerminBerikutnya || 1;
     document.getElementById('realisasi-tanggal').value  = new Date().toISOString().split('T')[0];
     document.getElementById('realisasi-nilai').value    = '';
     document.getElementById('realisasi-progress').value = '';
+    document.getElementById('realisasi-status-pembayaran').value = 'Belum Dibayar';
     document.getElementById('realisasi-ket').value      = '';
     const modalTitle = document.querySelector('#modal-realisasi h3');
     if (modalTitle) modalTitle.innerText = 'Tambah Riwayat Realisasi';
@@ -232,9 +243,10 @@ async function editRealisasi(id) {
 
     state.editingRealisasiId = id;
     document.getElementById('realisasi-tanggal').value  = realisasi.tanggal;
-    document.getElementById('realisasi-termin').value   = realisasi.termin || '';
+    document.getElementById('realisasi-termin-ke').value = realisasi.termin_ke || realisasi.termin || '';
     document.getElementById('realisasi-nilai').value    = realisasi.nilai;
     document.getElementById('realisasi-progress').value = realisasi.progress;
+    document.getElementById('realisasi-status-pembayaran').value = realisasi.status_pembayaran || 'Belum Dibayar';
     document.getElementById('realisasi-ket').value      = realisasi.keterangan || '';
 
     const modalTitle = document.querySelector('#modal-realisasi h3');
@@ -270,9 +282,10 @@ async function saveRealisasi(event) {
         pekerjaan_id:          state.selectedPekerjaanRealisasi,
         nama_pekerjaan:        state.selectedPekerjaanNamaRealisasi,
         tanggal:               document.getElementById('realisasi-tanggal').value,
-        termin:                document.getElementById('realisasi-termin').value,
+        termin_ke:             document.getElementById('realisasi-termin-ke').value,
         nilai:                 document.getElementById('realisasi-nilai').value,
         progress:              document.getElementById('realisasi-progress').value,
+        status_pembayaran:     document.getElementById('realisasi-status-pembayaran').value,
         keterangan:            document.getElementById('realisasi-ket').value
     };
 
