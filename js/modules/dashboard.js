@@ -8,13 +8,14 @@ window.renderDashboard = async function renderDashboard(filters = {}) {
     if (!contentArea) return;
     contentArea.innerHTML = '<div class="flex justify-center items-center py-24"><div class="loader"></div></div>';
 
-    const [data, pekerjaanList, kontrakList, realisasiList, pengadaanList, rabList] = await Promise.all([
+    const [data, pekerjaanList, kontrakList, realisasiList, pengadaanList, rabList, prkList] = await Promise.all([
         fetchAPI('action=dashboard'),
         fetchWithCache('Pekerjaan'),
         fetchWithCache('Kontrak'),
         fetchWithCache('Realisasi'),
         fetchWithCache('Pengadaan'),
-        fetchWithCache('RAB')
+        fetchWithCache('RAB'),
+        fetchWithCache('prk')
     ]);
 
     let pekerjaanArr   = Array.isArray(pekerjaanList)  ? pekerjaanList  : [];
@@ -22,6 +23,7 @@ window.renderDashboard = async function renderDashboard(filters = {}) {
     let realisasiArr   = Array.isArray(realisasiList)  ? realisasiList  : [];
     const pengadaanArr = Array.isArray(pengadaanList)  ? pengadaanList  : [];
     const rabArr       = Array.isArray(rabList)        ? rabList        : [];
+    const prkArr       = Array.isArray(prkList)        ? prkList        : [];
 
     // Lokasi unik untuk dropdown
     const lokasiUnique = [...new Set(pekerjaanArr.map(p => p.lokasi).filter(l => l))].sort();
@@ -60,7 +62,8 @@ window.renderDashboard = async function renderDashboard(filters = {}) {
     let totalPaguPengadaan = 0;
     pengadaanArr.forEach(p => {
         if (pengadaanIdsTerpilih.size === 0 || pengadaanIdsTerpilih.has(String(p.id))) {
-            totalPaguPengadaan += parseFloat(p.nilai_pagu) || 0;
+            const prk = prkArr.find(item => String(item.id) === String(p.id_prk || p.prk_id || p.id_prk_program));
+            totalPaguPengadaan += parseFloat(p.nilai_pagu) || parseFloat(prk?.pagu_dana) || 0;
         }
     });
     let totalRealisasi = data && data.realisasi ? parseFloat(data.realisasi) : 0;
@@ -169,17 +172,19 @@ window.renderDashboard = async function renderDashboard(filters = {}) {
                 String(item.status_pembayaran || '').trim().toLowerCase() === 'dibayar')
             .reduce((sum, item) => sum + (Number(item.nilai) || 0), 0);
         const disburse = Number(pengadaan.nilai_disburse) || 0;
+        const prk = prkArr.find(item => String(item.id) === String(pengadaan.id_prk || pengadaan.prk_id || pengadaan.id_prk_program));
+        const anggaranInvestasi = Number(pengadaan.nilai_pagu) || Number(prk?.pagu_dana) || 0;
         return {
             nomor: pengadaan.nomor_pengadaan || '-',
             nama: pengadaan.nama_pengadaan || '-',
-            pagu: Number(pengadaan.nilai_pagu) || 0,
+            pagu: anggaranInvestasi,
             disburse,
             rab: totalRAB,
             pa: totalPA,
             kontrak: totalKontrakPengadaan,
             tagihan: totalTagihan,
             bayar: totalBayar,
-            sisa: disburse - totalBayar
+            sisa: anggaranInvestasi - totalBayar
         };
     }).filter(row => row.pagu || row.disburse || row.rab || row.pa || row.kontrak || row.tagihan);
 
@@ -363,7 +368,7 @@ window.renderDashboard = async function renderDashboard(filters = {}) {
         <div class="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden mb-6">
             <div class="p-5 border-b border-slate-100 bg-slate-50/50"><h3 class="text-sm font-bold text-slate-800">Rekap Disburse Pengadaan</h3><p class="text-xs text-slate-500 mt-1">Nilai Disburse diisi manual pada Master Pengadaan.</p></div>
             <div class="overflow-x-auto"><table class="w-full text-left text-xs whitespace-nowrap"><thead class="bg-slate-100 text-slate-700 font-semibold"><tr>
-                <th class="p-3 text-center">No</th><th class="p-3">No. PRK/Pengadaan</th><th class="p-3">Uraian Pengadaan</th><th class="p-3 text-right">Anggaran/Pagu</th><th class="p-3 text-right">Disburse</th><th class="p-3 text-right">Total RAB</th><th class="p-3 text-right">Total PA</th><th class="p-3 text-right">Total Kontrak</th><th class="p-3 text-right">Tagihan/Realisasi</th><th class="p-3 text-right">Total Bayar</th><th class="p-3 text-right">Sisa Disburse</th>
+                <th class="p-3 text-center">No</th><th class="p-3">No. PRK/Pengadaan</th><th class="p-3">Uraian Pengadaan</th><th class="p-3 text-right">ANGGARAN INVESTASI</th><th class="p-3 text-right">Disburse</th><th class="p-3 text-right">Total RAB</th><th class="p-3 text-right">Total PA</th><th class="p-3 text-right">Total Kontrak</th><th class="p-3 text-right">Tagihan/Realisasi</th><th class="p-3 text-right">Total Bayar</th><th class="p-3 text-right">SISA PRK</th>
             </tr></thead><tbody>${rekapDisburseHTML}</tbody></table></div>
         </div>
 
