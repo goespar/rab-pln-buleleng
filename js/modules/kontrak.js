@@ -7,12 +7,14 @@ window.renderKontrak = async function renderKontrak() {
     const contentArea = document.getElementById('app-content');
     if (!contentArea) return;
 
-    const [pekerjaanList, penyediaList] = await Promise.all([
+    const [pekerjaanList, penyediaList, tenderList] = await Promise.all([
         fetchWithCache('Pekerjaan'),
-        fetchWithCache('Penyedia')
+        fetchWithCache('Penyedia'),
+        fetchWithCache('Tender')
     ]);
     window.allPekerjaanListKontrak = Array.isArray(pekerjaanList) ? pekerjaanList : [];
     window.allPenyediaListKontrak  = Array.isArray(penyediaList)  ? penyediaList  : [];
+    window.allTenderListKontrak    = Array.isArray(tenderList) ? tenderList : [];
 
     let optPekerjaan = '<option value="">-- Pilih Nama Pekerjaan --</option>';
     window.allPekerjaanListKontrak.forEach(p => {
@@ -24,6 +26,14 @@ window.renderKontrak = async function renderKontrak() {
     window.allPenyediaListKontrak.forEach(p => {
         const nama = p.nama || p.nama_perusahaan || '-';
         optPenyedia += `<option value="${nama}">${nama}</option>`;
+    });
+
+    let optTender = '<option value="">-- Pilih hasil tender (opsional) --</option>';
+    window.allTenderListKontrak.forEach(t => {
+        const pekerjaan = window.allPekerjaanListKontrak.find(p => String(p.id) === String(t.pekerjaan_id));
+        const penyedia = window.allPenyediaListKontrak.find(p => String(p.id) === String(t.penyedia_id));
+        const label = `${pekerjaan?.nama_pekerjaan || t.pekerjaan_id || '-'} - ${penyedia?.nama_penyedia || penyedia?.nama || t.penyedia_id || '-'} - ${CONFIG.formatCurrency(Number(t.nilai_penawaran) || 0)}`;
+        optTender += `<option value="${t.id}" data-pekerjaan-id="${t.pekerjaan_id || ''}" data-penyedia-id="${t.penyedia_id || ''}" data-nilai="${t.nilai_penawaran || 0}">${label}</option>`;
     });
 
     contentArea.innerHTML = `
@@ -65,6 +75,10 @@ window.renderKontrak = async function renderKontrak() {
                                 <select id="kontrak-penyedia" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:border-brand outline-none bg-white">${optPenyedia}</select>
                                 <input type="text" id="kontrak-penyedia-manual" placeholder="Atau ketik manual..." class="w-full mt-1.5 border border-slate-200 rounded-lg px-3 py-1.5 text-xs focus:border-brand outline-none text-slate-600 bg-slate-50">
                             </div>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-semibold text-slate-700 mb-1">Referensi Hasil Tender</label>
+                            <select id="kontrak-tender" onchange="applyTenderToKontrak(this.value)" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:border-brand outline-none bg-white">${optTender}</select>
                         </div>
                         <div class="grid grid-cols-2 gap-4">
                             <div>
@@ -169,7 +183,7 @@ async function loadKontrakData() {
 function showModalKontrak(isEdit = false) {
     if (!isEdit) {
         state.editId = null;
-        ['kontrak-nomor','kontrak-pekerjaan','kontrak-pekerjaan-manual','kontrak-penyedia','kontrak-penyedia-manual','kontrak-nilai','kontrak-tanggal','kontrak-mulai','kontrak-selesai'].forEach(id => {
+        ['kontrak-nomor','kontrak-pekerjaan','kontrak-pekerjaan-manual','kontrak-penyedia','kontrak-penyedia-manual','kontrak-nilai','kontrak-tanggal','kontrak-mulai','kontrak-selesai','kontrak-tender'].forEach(id => {
             const el = document.getElementById(id); if (el) el.value = '';
         });
         const statusEl = document.getElementById('kontrak-status');
@@ -182,6 +196,21 @@ function showModalKontrak(isEdit = false) {
     if (!modal) return;
     modal.classList.remove('hidden');
     setTimeout(() => { modal.classList.remove('opacity-0'); modal.querySelector('div').classList.remove('scale-95'); }, 10);
+}
+
+function applyTenderToKontrak(tenderId) {
+    const tender = (window.allTenderListKontrak || []).find(item => String(item.id) === String(tenderId));
+    if (!tender) return;
+
+    const pekerjaanSelect = document.getElementById('kontrak-pekerjaan');
+    const penyediaSelect = document.getElementById('kontrak-penyedia');
+    if (pekerjaanSelect) pekerjaanSelect.value = pekerjaanSelect.querySelector(`option[data-id="${tender.pekerjaan_id}"]`)?.value || '';
+
+    const penyedia = (window.allPenyediaListKontrak || []).find(item => String(item.id) === String(tender.penyedia_id));
+    const namaPenyedia = penyedia?.nama || penyedia?.nama_penyedia || penyedia?.nama_perusahaan || '';
+    if (penyediaSelect) penyediaSelect.value = namaPenyedia;
+    const nilaiEl = document.getElementById('kontrak-nilai');
+    if (nilaiEl) nilaiEl.value = Number(tender.nilai_penawaran) || 0;
 }
 
 function closeModalKontrak() {

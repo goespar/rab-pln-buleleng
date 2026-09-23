@@ -6,16 +6,18 @@
 window.renderLaporan = async function renderLaporan(filters = {}) {
     const contentArea = document.getElementById('app-content');
 
-    const [pekerjaanList, kontrakList, realisasiList, penyediaList] = await Promise.all([
+    const [pekerjaanList, kontrakList, realisasiList, penyediaList, pengadaanList] = await Promise.all([
         fetchWithCache('Pekerjaan'),
         fetchWithCache('Kontrak'),
         fetchWithCache('Realisasi'),
-        fetchWithCache('Penyedia')
+        fetchWithCache('Penyedia'),
+        fetchWithCache('Pengadaan')
     ]);
 
     let pekerjaan = pekerjaanList  || [];
     let kontrak   = kontrakList    || [];
     let realisasi = realisasiList  || [];
+    const pengadaan = pengadaanList || [];
 
     const lokasiUnique = [...new Set(pekerjaan.map(p => p.lokasi).filter(l => l))].sort();
     const tahunUnique  = [...new Set(pekerjaan.map(p => p.tahun_anggaran).filter(t => t))].sort().reverse();
@@ -59,6 +61,14 @@ window.renderLaporan = async function renderLaporan(filters = {}) {
     const avgFisik    = progValues.length ? (progValues.reduce((a, b) => a + b, 0) / progValues.length) : 0;
     const pctKeuangan = totalKontrak > 0 ? ((totalRealisasiNilai / totalKontrak) * 100).toFixed(1) : 0;
     const sisaAnggaran= totalKontrak - totalRealisasiNilai;
+    const totalPagu = pekerjaan.reduce((sum, item) => {
+        const pengadaanId = item.pengadaan_id || item.id_pengadaan_prk;
+        const parent = pengadaan.find(p => String(p.id) === String(pengadaanId));
+        return sum + (parseFloat(item.nilai_pagu) || parseFloat(parent?.nilai_pagu) || 0);
+    }, 0);
+    const efisiensiNilai = totalPagu - totalKontrak;
+    const efisiensiPersen = totalPagu > 0 ? (efisiensiNilai / totalPagu) * 100 : 0;
+    const serapanPersen = totalKontrak > 0 ? (totalRealisasiNilai / totalKontrak) * 100 : 0;
     const fmtM        = (v) => v >= 1e9 ? `Rp ${(v/1e9).toFixed(2)} M` : `Rp ${(v/1e6).toFixed(0)} Jt`;
 
     const penyediaUnik = [...new Set((kontrakList||[]).map(k => k.nama_penyedia).filter(p => p))].sort();
@@ -132,6 +142,17 @@ window.renderLaporan = async function renderLaporan(filters = {}) {
             <div class="bg-white p-4 rounded-xl shadow-sm border border-slate-100 flex items-center gap-4">
                 <div class="p-3 bg-rose-100 text-rose-600 rounded-xl"><i data-lucide="trending-down" class="w-6 h-6"></i></div>
                 <div><p class="text-[10px] font-bold text-slate-500 uppercase">Sisa Anggaran</p><h3 class="text-lg font-bold text-slate-800">${fmtM(sisaAnggaran > 0 ? sisaAnggaran : 0)}</h3></div>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+            <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-100">
+                <div class="flex items-center justify-between mb-3"><h3 class="text-sm font-bold text-slate-800">Rekap Efisiensi</h3><i data-lucide="badge-percent" class="w-5 h-5 text-blue-500"></i></div>
+                <div class="grid grid-cols-3 gap-3 text-xs"><div><p class="text-slate-500">Nilai Pagu</p><p class="font-bold text-slate-800 mt-1">${CONFIG.formatCurrency(totalPagu)}</p></div><div><p class="text-slate-500">Nilai Kontrak</p><p class="font-bold text-brand mt-1">${CONFIG.formatCurrency(totalKontrak)}</p></div><div><p class="text-slate-500">Efisiensi</p><p class="font-bold ${efisiensiNilai >= 0 ? 'text-emerald-600' : 'text-red-600'} mt-1">${CONFIG.formatCurrency(efisiensiNilai)} (${efisiensiPersen.toFixed(1)}%)</p></div></div>
+            </div>
+            <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-100">
+                <div class="flex items-center justify-between mb-3"><h3 class="text-sm font-bold text-slate-800">Rekap Serapan Anggaran</h3><i data-lucide="pie-chart" class="w-5 h-5 text-emerald-500"></i></div>
+                <div class="grid grid-cols-3 gap-3 text-xs"><div><p class="text-slate-500">Nilai Kontrak</p><p class="font-bold text-slate-800 mt-1">${CONFIG.formatCurrency(totalKontrak)}</p></div><div><p class="text-slate-500">Realisasi Pembayaran</p><p class="font-bold text-emerald-600 mt-1">${CONFIG.formatCurrency(totalRealisasiNilai)}</p></div><div><p class="text-slate-500">Serapan</p><p class="font-bold text-brand mt-1">${serapanPersen.toFixed(1)}%</p></div></div>
             </div>
         </div>
 

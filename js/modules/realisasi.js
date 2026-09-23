@@ -242,6 +242,20 @@ async function saveRealisasi(event) {
     const currentUser = state.currentUser ? state.currentUser.nama : 'Admin';
 
     try {
+        const nilaiTerminBaru = Number(data.nilai) || 0;
+        const limitResult = await fetchAPI('', 'POST', {
+            action: 'cekLimitRealisasi',
+            table: 'Realisasi',
+            pekerjaan_id: state.selectedPekerjaanRealisasi,
+            nilai_termin_baru: nilaiTerminBaru,
+            realisasi_id: isUpdate ? state.editingRealisasiId : ''
+        });
+
+        if (!limitResult) throw new Error('Validasi batas kontrak gagal.');
+        if (limitResult.error || limitResult.success === false) {
+            throw new Error(limitResult.message || 'Nilai termin melebihi nilai kontrak.');
+        }
+
         let result = false;
         if (isUpdate) {
             await fetchAPI(`action=delete&table=Realisasi&id=${encodeURIComponent(state.editingRealisasiId)}&user=${encodeURIComponent(currentUser)}`, 'POST', {});

@@ -33,7 +33,7 @@ function doPost(e) {
 
     if (action === 'cekLimitRealisasi') {
       return createJsonResponse(
-        cekLimitRealisasi(payload.pekerjaan_id, payload.nilai_termin_baru)
+        cekLimitRealisasi(payload.pekerjaan_id, payload.nilai_termin_baru, payload.realisasi_id)
       );
     }
     
@@ -191,7 +191,7 @@ function simpanRABTerkoreksi(pekerjaan_id, dataKoreksi) {
   throw new Error('Pekerjaan dengan ID tersebut tidak ditemukan.');
 }
 
-function cekLimitRealisasi(pekerjaan_id, nilai_termin_baru) {
+function cekLimitRealisasi(pekerjaan_id, nilai_termin_baru, realisasi_id) {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var kontrakSheet = ss.getSheetByName('Kontrak');
   var realisasiSheet = ss.getSheetByName('Realisasi');
@@ -223,6 +223,7 @@ function cekLimitRealisasi(pekerjaan_id, nilai_termin_baru) {
   var realisasiData = realisasiSheet.getDataRange().getValues();
   var realisasiHeaders = realisasiData[0];
   var realisasiIdIndex = cariIndexKolom(realisasiHeaders, ['pekerjaan_id', 'id_pekerjaan']);
+  var realisasiRowIdIndex = cariIndexKolom(realisasiHeaders, ['id']);
   var nilaiRealisasiIndex = cariIndexKolom(realisasiHeaders, ['nilai_termin', 'nilai_realisasi', 'nilai']);
 
   if (realisasiIdIndex === -1 || nilaiRealisasiIndex === -1) {
@@ -231,7 +232,8 @@ function cekLimitRealisasi(pekerjaan_id, nilai_termin_baru) {
 
   var totalRealisasiSebelumnya = 0;
   for (var j = 1; j < realisasiData.length; j++) {
-    if (String(realisasiData[j][realisasiIdIndex]) === String(pekerjaan_id)) {
+    if (String(realisasiData[j][realisasiIdIndex]) === String(pekerjaan_id) &&
+      (!realisasi_id || realisasiRowIdIndex === -1 || String(realisasiData[j][realisasiRowIdIndex]) !== String(realisasi_id))) {
       totalRealisasiSebelumnya += parseNilaiAngka(realisasiData[j][nilaiRealisasiIndex]);
     }
   }
