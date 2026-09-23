@@ -291,7 +291,12 @@ async function saveKontrak(event) {
     };
 
     const pekerjaanTerbaru = await fetchAPI('action=list&table=Pekerjaan');
-    const pekerjaanTerpilih = (pekerjaanTerbaru || []).find(item => String(item.id) === String(pekerjaanId));
+    const tenderTerpilih = (window.allTenderListKontrak || []).find(item => {
+        return String(item.pekerjaan_id) === String(pekerjaanId) ||
+            String(item.id) === String(document.getElementById('kontrak-tender')?.value);
+    });
+    const idPekerjaanValid = tenderTerpilih?.pekerjaan_id || pekerjaanId;
+    const pekerjaanTerpilih = (pekerjaanTerbaru || []).find(item => String(item.id) === String(idPekerjaanValid));
     if (!pekerjaanTerpilih) {
         if (btn) { btn.disabled = false; btn.innerHTML = 'Simpan Kontrak'; }
         return showToast('Pekerjaan tidak ditemukan. Silakan pilih ulang pekerjaan.', 'error');
@@ -301,6 +306,8 @@ async function saveKontrak(event) {
         if (btn) { btn.disabled = false; btn.innerHTML = 'Simpan Kontrak'; }
         return showToast('Kontrak hanya dapat dibuat setelah disetujui PA.', 'error');
     }
+
+    data.pekerjaan_id = pekerjaanTerpilih.id;
 
     const isUpdate    = state.editId && !String(state.editId).startsWith('temp_');
     const currentUser = state.currentUser ? state.currentUser.nama : 'Admin';
