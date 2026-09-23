@@ -69,13 +69,12 @@ window.renderPengadaan = async function renderPengadaan() {
 async function loadPengadaanData() {
     const data = await fetchWithCache('Pengadaan') || [];
     let html = `<table class="w-full text-left border-collapse text-sm"><thead class="bg-slate-100"><tr>
-        <th class="p-3">No</th><th class="p-3">Nomor</th><th class="p-3">Nama Pengadaan</th>
+        <th class="p-3">No</th><th class="p-3">Nama Pengadaan</th>
         <th class="p-3">Tahun & Sumber</th><th class="p-3">Aksi</th>
     </tr></thead><tbody class="divide-y">`;
     data.forEach((p, i) => {
         html += `<tr>
             <td class="p-3">${i + 1}</td>
-            <td class="p-3 font-semibold">${p.nomor_pengadaan || '-'}</td>
             <td class="p-3">${p.nama_pengadaan}</td>
             <td class="p-3"><span class="font-bold">${p.tahun || '-'}</span><br>
                 <span class="text-xs bg-slate-200 px-2 py-0.5 rounded">${p.sumber_anggaran || 'APLN'}</span></td>
@@ -138,11 +137,13 @@ async function savePengadaan(e) {
             nilai_disburse:  document.getElementById('pengadaan-disburse').value
         }
     };
-    if (state.editId) payload.id = state.editId;
+    if (state.editId) payload.data.id = state.editId;
 
-    await fetchAPI('', 'POST', payload);
+    const result = await fetchAPI('', 'POST', payload);
+    if (!result) return;
     showToast(state.editId ? 'Data Pengadaan diperbarui' : 'Data Pengadaan disimpan');
     closeModalPengadaan();
+    invalidateCache('Pengadaan');
     loadPengadaanData();
 }
 
