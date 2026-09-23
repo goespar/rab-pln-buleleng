@@ -289,16 +289,23 @@ window.loadWorkflowPASummary = function loadWorkflowPASummary(pekerjaanId) {
         <div class="bg-slate-50 border border-slate-200 rounded-xl p-4">
             <div class="flex justify-between text-sm"><span class="text-slate-500">Jumlah item RAB terkoreksi</span><strong>${items.length}</strong></div>
             <div class="flex justify-between text-sm mt-2"><span class="text-slate-500">Nilai RAB kontrak</span><strong class="text-brand">${CONFIG.formatCurrency(total)}</strong></div>
+            <div class="mt-4">
+                <label class="block text-xs font-bold text-slate-500 mb-1.5 uppercase tracking-wide">Nilai Persetujuan PA (Rp)</label>
+                <input id="workflow-pa-nilai" type="number" min="0" step="any" value="${Number((window.workflowData.pekerjaan.find(item => String(item.id) === String(pekerjaanId)) || {}).nilai_pa) || total}" class="w-full border border-slate-300 rounded-lg px-3 py-2.5 text-sm focus:border-brand outline-none">
+            </div>
         </div>
-        <button type="button" onclick="approveWorkflowPA('${pekerjaanId}')" class="mt-4 bg-emerald-600 text-white px-5 py-2.5 rounded-lg text-sm font-semibold hover:bg-emerald-700 flex items-center gap-2"><i data-lucide="check-circle" class="w-4 h-4"></i> Setujui PA dan Teruskan ke Kontrak</button>`;
+        <button type="button" onclick="approveWorkflowPA('${pekerjaanId}')" class="mt-4 bg-emerald-600 text-white px-5 py-2.5 rounded-lg text-sm font-semibold hover:bg-emerald-700 flex items-center gap-2"><i data-lucide="check-circle" class="w-4 h-4"></i> Simpan Nilai PA & Setujui</button>`;
     lucide.createIcons();
 };
 
 window.approveWorkflowPA = async function approveWorkflowPA(pekerjaanId) {
+    const nilaiPA = Number(document.getElementById('workflow-pa-nilai')?.value) || 0;
+    if (nilaiPA <= 0) return showToast('Nilai persetujuan PA wajib diisi.', 'error');
+
     const result = await fetchAPI('', 'POST', {
         action: 'update',
         table: 'Pekerjaan',
-        data: { id: pekerjaanId, status: 'Disetujui PA' }
+        data: { id: pekerjaanId, status: 'Disetujui PA', nilai_pa: nilaiPA }
     });
     if (!result) return;
     invalidateCache('Pekerjaan');

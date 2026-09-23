@@ -206,6 +206,7 @@ function applyTenderToKontrak(tenderId) {
     const tender = (window.allTenderListKontrak || []).find(item => String(item.id) === String(tenderId));
     if (!tender) return;
 
+    const pekerjaan = (window.allPekerjaanListKontrak || []).find(item => String(item.id) === String(tender.pekerjaan_id));
     const pekerjaanSelect = document.getElementById('kontrak-pekerjaan');
     const penyediaSelect = document.getElementById('kontrak-penyedia');
     if (pekerjaanSelect) pekerjaanSelect.value = pekerjaanSelect.querySelector(`option[data-id="${tender.pekerjaan_id}"]`)?.value || '';
@@ -214,7 +215,7 @@ function applyTenderToKontrak(tenderId) {
     const namaPenyedia = penyedia?.nama || penyedia?.nama_penyedia || penyedia?.nama_perusahaan || '';
     if (penyediaSelect) penyediaSelect.value = namaPenyedia;
     const nilaiEl = document.getElementById('kontrak-nilai');
-    if (nilaiEl) nilaiEl.value = Number(tender.nilai_penawaran) || 0;
+    if (nilaiEl) nilaiEl.value = Number(pekerjaan?.nilai_pa) || Number(tender.nilai_penawaran) || 0;
 }
 
 function closeModalKontrak() {
