@@ -53,7 +53,8 @@ async function loadLogData() {
     }
 
     // Urutkan terbaru dulu
-    const sorted = [...logList].sort((a, b) => new Date(b.tanggal) - new Date(a.tanggal));
+    const getLogTime = log => log.tanggal || log.created_at || log.timestamp || log.waktu || '';
+    const sorted = [...logList].sort((a, b) => new Date(getLogTime(b)) - new Date(getLogTime(a)));
 
     let html = '';
     sorted.slice(0, 50).forEach((log, i) => {
@@ -70,7 +71,7 @@ async function loadLogData() {
         html += `
             <tr class="hover:bg-slate-50">
                 <td class="p-3 text-center text-slate-500">${i + 1}</td>
-                <td class="p-3 text-xs">${CONFIG.formatDate(log.tanggal)}</td>
+                <td class="p-3 text-xs">${formatLogDateTime(getLogTime(log))}</td>
                 <td class="p-3 font-medium text-slate-800">
                     <span class="flex items-center gap-2">
                         <div class="w-6 h-6 rounded-full ${avatarColor} text-white flex items-center justify-center text-[10px]">${avatarLetter}</div>
@@ -83,5 +84,19 @@ async function loadLogData() {
         `;
     });
     tbody.innerHTML = html;
+}
+
+function formatLogDateTime(value) {
+    if (!value) return '-';
+    const date = new Date(value);
+    if (isNaN(date.getTime())) return String(value);
+    return date.toLocaleString('id-ID', {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit'
+    });
 }
 

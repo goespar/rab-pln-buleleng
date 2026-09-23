@@ -3,7 +3,7 @@
 // Modul Manajemen Pengguna
 // ==========================================
 
-window.renderUser( = async function renderUser() {
+window.renderUser = async function renderUser() {
     const contentArea = document.getElementById('app-content');
     contentArea.innerHTML = '<div class="flex justify-center py-24"><div class="loader"></div></div>';
 
