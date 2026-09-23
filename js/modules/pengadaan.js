@@ -49,6 +49,10 @@ window.renderPengadaan = async function renderPengadaan() {
                             <label class="block text-sm font-medium mb-1">Nilai Pagu (Rp)</label>
                             <input type="number" id="pengadaan-pagu" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm outline-none focus:border-brand">
                         </div>
+                        <div>
+                            <label class="block text-sm font-medium mb-1">Nilai Disburse (Rp)</label>
+                            <input type="number" id="pengadaan-disburse" min="0" step="any" placeholder="Diisi manual" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm outline-none focus:border-brand">
+                        </div>
                     </div>
                     <div class="mt-6 flex justify-end gap-3">
                         <button type="button" onclick="closeModalPengadaan()" class="px-4 py-2 border rounded-lg text-sm">Batal</button>
@@ -94,6 +98,7 @@ function showModalPengadaan(isEdit = false) {
         document.getElementById('pengadaan-tahun').value = new Date().getFullYear();
         document.getElementById('pengadaan-sumber').value = '';
         document.getElementById('pengadaan-pagu').value = '';
+        document.getElementById('pengadaan-disburse').value = '';
     }
     document.getElementById('modal-pengadaan').classList.remove('hidden', 'opacity-0');
 }
@@ -113,6 +118,7 @@ async function editPengadaan(id) {
     document.getElementById('pengadaan-tahun').value  = item.tahun || new Date().getFullYear();
     document.getElementById('pengadaan-sumber').value = item.sumber_anggaran || '';
     document.getElementById('pengadaan-pagu').value   = item.nilai_pagu || '';
+    document.getElementById('pengadaan-disburse').value = item.nilai_disburse || '';
     showModalPengadaan(true);
 }
 
@@ -128,7 +134,8 @@ async function savePengadaan(e) {
             nama_pengadaan:  document.getElementById('pengadaan-nama').value,
             tahun:           document.getElementById('pengadaan-tahun').value,
             sumber_anggaran: document.getElementById('pengadaan-sumber').value,
-            nilai_pagu:      document.getElementById('pengadaan-pagu').value
+            nilai_pagu:      document.getElementById('pengadaan-pagu').value,
+            nilai_disburse:  document.getElementById('pengadaan-disburse').value
         }
     };
     if (state.editId) payload.id = state.editId;

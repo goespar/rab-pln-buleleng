@@ -8,18 +8,20 @@ window.renderDashboard = async function renderDashboard(filters = {}) {
     if (!contentArea) return;
     contentArea.innerHTML = '<div class="flex justify-center items-center py-24"><div class="loader"></div></div>';
 
-    const [data, pekerjaanList, kontrakList, realisasiList, pengadaanList] = await Promise.all([
+    const [data, pekerjaanList, kontrakList, realisasiList, pengadaanList, rabList] = await Promise.all([
         fetchAPI('action=dashboard'),
         fetchWithCache('Pekerjaan'),
         fetchWithCache('Kontrak'),
         fetchWithCache('Realisasi'),
-        fetchWithCache('Pengadaan')
+        fetchWithCache('Pengadaan'),
+        fetchWithCache('RAB')
     ]);
 
     let pekerjaanArr   = Array.isArray(pekerjaanList)  ? pekerjaanList  : [];
     let kontrakArr     = Array.isArray(kontrakList)    ? kontrakList    : [];
     let realisasiArr   = Array.isArray(realisasiList)  ? realisasiList  : [];
     const pengadaanArr = Array.isArray(pengadaanList)  ? pengadaanList  : [];
+    const rabArr       = Array.isArray(rabList)        ? rabList        : [];
 
     // Lokasi unik untuk dropdown
     const lokasiUnique = [...new Set(pekerjaanArr.map(p => p.lokasi).filter(l => l))].sort();
@@ -145,6 +147,46 @@ window.renderDashboard = async function renderDashboard(filters = {}) {
         else statusCounts['On Progress']++;
     });
     if (kontrakArr.length === 0 && totalPaket > 0) statusCounts['Belum Mulai'] = totalPaket;
+
+    const rekapDisburseRows = pengadaanArr.map(pengadaan => {
+        const pengadaanId = String(pengadaan.id);
+        const pekerjaanUntukPengadaan = pekerjaanArr.filter(item =>
+            String(item.pengadaan_id || item.id_pengadaan_prk) === pengadaanId
+        );
+        const pekerjaanIdsUntukPengadaan = new Set(pekerjaanUntukPengadaan.map(item => String(item.id)));
+        const totalRAB = rabArr
+            .filter(item => pekerjaanIdsUntukPengadaan.has(String(item.pekerjaan_id)) && String(item.versi_rab || '').toLowerCase() !== 'terkoreksi')
+            .reduce((sum, item) => sum + (Number(item.jumlah) || ((Number(item.volume) || 0) * ((Number(item.harga_material) || 0) + (Number(item.harga_jasa) || 0)))), 0);
+        const totalPA = pekerjaanUntukPengadaan.reduce((sum, item) => sum + (Number(item.nilai_pa) || 0), 0);
+        const totalKontrakPengadaan = kontrakArr
+            .filter(item => pekerjaanIdsUntukPengadaan.has(String(item.pekerjaan_id)))
+            .reduce((sum, item) => sum + (Number(item.nilai_kontrak) || 0), 0);
+        const totalTagihan = realisasiArr
+            .filter(item => pekerjaanIdsUntukPengadaan.has(String(item.pekerjaan_id)))
+            .reduce((sum, item) => sum + (Number(item.nilai) || 0), 0);
+        const disburse = Number(pengadaan.nilai_disburse) || 0;
+        return {
+            nomor: pengadaan.nomor_pengadaan || '-',
+            nama: pengadaan.nama_pengadaan || '-',
+            pagu: Number(pengadaan.nilai_pagu) || 0,
+            disburse,
+            rab: totalRAB,
+            pa: totalPA,
+            kontrak: totalKontrakPengadaan,
+            tagihan: totalTagihan,
+            sisa: disburse - totalTagihan
+        };
+    }).filter(row => row.pagu || row.disburse || row.rab || row.pa || row.kontrak || row.tagihan);
+
+    const rekapDisburseHTML = rekapDisburseRows.length === 0
+        ? '<tr><td colspan="10" class="p-8 text-center text-slate-400 italic">Belum ada data pengadaan untuk direkap.</td></tr>'
+        : rekapDisburseRows.map((row, index) => `<tr class="border-b border-slate-100 hover:bg-slate-50">
+            <td class="p-3 text-center">${index + 1}</td><td class="p-3 font-semibold">${row.nomor}</td><td class="p-3 min-w-64">${row.nama}</td>
+            <td class="p-3 text-right">${CONFIG.formatCurrency(row.pagu)}</td><td class="p-3 text-right text-blue-700">${CONFIG.formatCurrency(row.disburse)}</td>
+            <td class="p-3 text-right">${CONFIG.formatCurrency(row.rab)}</td><td class="p-3 text-right text-amber-700">${CONFIG.formatCurrency(row.pa)}</td>
+            <td class="p-3 text-right text-brand">${CONFIG.formatCurrency(row.kontrak)}</td><td class="p-3 text-right text-emerald-700">${CONFIG.formatCurrency(row.tagihan)}</td>
+            <td class="p-3 text-right font-bold ${row.sisa >= 0 ? 'text-emerald-700' : 'text-red-600'}">${CONFIG.formatCurrency(row.sisa)}</td>
+        </tr>`).join('');
 
     contentArea.innerHTML = `
         <!-- FILTER -->
@@ -311,6 +353,13 @@ window.renderDashboard = async function renderDashboard(filters = {}) {
                     </div>
                 </div>
             </div>
+        </div>
+
+        <div class="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden mb-6">
+            <div class="p-5 border-b border-slate-100 bg-slate-50/50"><h3 class="text-sm font-bold text-slate-800">Rekap Disburse Pengadaan</h3><p class="text-xs text-slate-500 mt-1">Nilai Disburse diisi manual pada Master Pengadaan.</p></div>
+            <div class="overflow-x-auto"><table class="w-full text-left text-xs whitespace-nowrap"><thead class="bg-slate-100 text-slate-700 font-semibold"><tr>
+                <th class="p-3 text-center">No</th><th class="p-3">No. PRK/Pengadaan</th><th class="p-3">Uraian Pengadaan</th><th class="p-3 text-right">Anggaran/Pagu</th><th class="p-3 text-right">Disburse</th><th class="p-3 text-right">Total RAB</th><th class="p-3 text-right">Total PA</th><th class="p-3 text-right">Total Kontrak</th><th class="p-3 text-right">Tagihan/Realisasi</th><th class="p-3 text-right">Sisa Disburse</th>
+            </tr></thead><tbody>${rekapDisburseHTML}</tbody></table></div>
         </div>
 
         <!-- QUICK ACCESS -->
