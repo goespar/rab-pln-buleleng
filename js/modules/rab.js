@@ -728,17 +728,43 @@ function recalculateSubtotalFooter() {
 async function saveAllRABToSheets() {
     if (!state.selectedPekerjaanRAB) return showToast('Pilih pekerjaan terlebih dahulu', 'error');
 
+    const lokasi = document.getElementById('info-lokasi-manual')?.value.trim() || '';
+    const savedItems = state.tempRABItems.filter(item =>
+        item.isSaved && item.id && !String(item.id).startsWith('temp_')
+    );
     const itemsNew = state.tempRABItems.filter(item =>
         (!item.isSaved || item.id.toString().startsWith('temp_')) && item.uraian && item.uraian.trim() !== ''
     );
 
-    if (itemsNew.length === 0) return showToast('Tidak ada item baru yang perlu disimpan.', 'info');
+    if (itemsNew.length === 0) {
+        if (!lokasi || savedItems.length === 0) {
+            return showToast('Tidak ada perubahan baru yang perlu disimpan.', 'info');
+        }
+
+        const currentUser = state.currentUser ? state.currentUser.nama : 'Admin';
+        let updatedCount = 0;
+        for (const item of savedItems) {
+            const result = await fetchAPI('', 'POST', {
+                action: 'update',
+                table: 'RAB',
+                user: currentUser,
+                data: { id: item.id, lokasi: lokasi }
+            });
+            if (result) updatedCount++;
+        }
+
+        if (updatedCount > 0) {
+            invalidateCache('RAB');
+            showToast(`Lokasi berhasil disimpan pada ${updatedCount} item RAB`);
+            await handleSelectPekerjaanRAB(state.selectedPekerjaanRAB);
+        }
+        return;
+    }
 
     const btn = document.getElementById('btn-save-all');
     if (btn) { btn.disabled = true; btn.innerHTML = '<div class="loader w-4 h-4 border-2 border-white border-t-transparent"></div> Menyimpan...'; }
 
     const currentUser = state.currentUser ? state.currentUser.nama : 'Admin';
-    const lokasi = document.getElementById('info-lokasi-manual')?.value.trim() || '';
     let successCount  = 0;
 
     for (let item of itemsNew) {
