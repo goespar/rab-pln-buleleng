@@ -5,22 +5,31 @@
 
 window.renderWorkflow = async function renderWorkflow() {
     const contentArea = document.getElementById('app-content');
-    const [pekerjaan, rab, penyedia, tender] = await Promise.all([
+    const [pekerjaan, rab, penyedia, tender, pengadaan, prk, program] = await Promise.all([
         fetchWithCache('Pekerjaan'),
         fetchWithCache('RAB'),
         fetchWithCache('Penyedia'),
-        fetchWithCache('Tender')
+        fetchWithCache('Tender'),
+        fetchWithCache('Pengadaan'),
+        fetchWithCache('prk'),
+        fetchWithCache('jenis_program')
     ]);
 
     window.workflowData = {
         pekerjaan: pekerjaan || [],
         rab: rab || [],
         penyedia: penyedia || [],
-        tender: tender || []
+        tender: tender || [],
+        pengadaan: pengadaan || [],
+        prk: prk || [],
+        program: program || []
     };
 
-    const pekerjaanOptions = window.workflowData.pekerjaan.map(p =>
-        `<option value="${p.id}">${p.nomor_paket || '-'} - ${p.nama_pekerjaan || p.nama_komponen || '-'}</option>`
+    const prkOptions = window.workflowData.prk.map(item =>
+        `<option value="${item.id}">${item.no_prk || '-'} - ${item.prk || item.nama || '-'}</option>`
+    ).join('');
+    const pengadaanOptions = window.workflowData.pengadaan.map(item =>
+        `<option value="${item.id}">${item.nomor_pengadaan || item.nama_pengadaan || '-'}${item.nama_pengadaan && item.nomor_pengadaan ? ` - ${item.nama_pengadaan}` : ''}</option>`
     ).join('');
 
     contentArea.innerHTML = `
@@ -33,25 +42,30 @@ window.renderWorkflow = async function renderWorkflow() {
                 <button type="button" onclick="switchWorkflowTab('hps')" data-workflow-tab="hps" class="workflow-tab px-4 py-2 rounded-lg bg-brand text-white text-sm font-semibold">Edit RAB HPS</button>
                 <button type="button" onclick="switchWorkflowTab('tender')" data-workflow-tab="tender" class="workflow-tab px-4 py-2 rounded-lg text-slate-600 hover:bg-white text-sm font-semibold">Hasil Tender</button>
                 <button type="button" onclick="switchWorkflowTab('koreksi')" data-workflow-tab="koreksi" class="workflow-tab px-4 py-2 rounded-lg text-slate-600 hover:bg-white text-sm font-semibold">Koreksi RAB</button>
-                <button type="button" onclick="switchWorkflowTab('pa')" data-workflow-tab="pa" class="workflow-tab px-4 py-2 rounded-lg text-slate-600 hover:bg-white text-sm font-semibold">Persetujuan PA</button>
+                <button type="button" onclick="switchWorkflowTab('pa')" data-workflow-tab="pa" class="workflow-tab px-4 py-2 rounded-lg text-slate-600 hover:bg-white text-sm font-semibold">Review & Finalisasi</button>
             </div>
             <div id="workflow-hps" class="workflow-panel p-6">
-                <div class="max-w-xl">
-                    <label class="block text-xs font-bold text-slate-500 mb-1.5 uppercase tracking-wide">Pilih Pekerjaan</label>
-                    <select id="workflow-hps-pekerjaan" onchange="loadWorkflowHPS(this.value)" class="w-full border border-slate-300 rounded-lg px-3 py-2.5 text-sm bg-white focus:border-brand outline-none">
-                        <option value="">-- Pilih Pekerjaan --</option>${pekerjaanOptions}
-                    </select>
+                <div class="max-w-xl space-y-4">
+                    <div><label class="block text-xs font-bold text-slate-500 mb-1.5 uppercase tracking-wide">Pilih PRK</label>
+                        <select id="workflow-hps-prk" onchange="filterWorkflowPengadaan('hps', this.value)" class="w-full border border-slate-300 rounded-lg px-3 py-2.5 text-sm bg-white focus:border-brand outline-none"><option value="">-- Pilih PRK --</option>${prkOptions}</select></div>
+                    <div><label class="block text-xs font-bold text-slate-500 mb-1.5 uppercase tracking-wide">Pilih Pengadaan</label>
+                        <select id="workflow-hps-pengadaan" onchange="filterWorkflowPekerjaan('hps', this.value)" disabled class="w-full border border-slate-300 rounded-lg px-3 py-2.5 text-sm bg-white focus:border-brand outline-none"><option value="">-- Pilih PRK Dahulu --</option></select></div>
+                    <div><label class="block text-xs font-bold text-slate-500 mb-1.5 uppercase tracking-wide">Pilih Komponen Pekerjaan</label>
+                        <select id="workflow-hps-pekerjaan" onchange="loadWorkflowHPS(this.value)" disabled class="w-full border border-slate-300 rounded-lg px-3 py-2.5 text-sm bg-white focus:border-brand outline-none"><option value="">-- Pilih Pengadaan Terlebih Dahulu --</option></select></div>
                 </div>
                 <div id="workflow-hps-table" class="mt-6"></div>
             </div>
             <div id="workflow-tender" class="workflow-panel hidden p-6">
                 <form onsubmit="saveWorkflowTender(event)" class="max-w-3xl space-y-5">
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div>
-                            <label class="block text-xs font-bold text-slate-500 mb-1.5 uppercase tracking-wide">Pekerjaan</label>
-                            <select id="workflow-tender-pekerjaan" required class="w-full border border-slate-300 rounded-lg px-3 py-2.5 text-sm bg-white focus:border-brand outline-none">
-                                <option value="">-- Pilih Pekerjaan --</option>${pekerjaanOptions}
-                            </select>
+                        <div><label class="block text-xs font-bold text-slate-500 mb-1.5 uppercase tracking-wide">PRK</label>
+                            <select id="workflow-tender-prk" onchange="filterWorkflowPengadaan('tender', this.value)" required class="w-full border border-slate-300 rounded-lg px-3 py-2.5 text-sm bg-white focus:border-brand outline-none"><option value="">-- Pilih PRK --</option>${prkOptions}</select>
+                        </div>
+                        <div><label class="block text-xs font-bold text-slate-500 mb-1.5 uppercase tracking-wide">Pengadaan</label>
+                            <select id="workflow-tender-pengadaan" onchange="filterWorkflowPekerjaan('tender', this.value)" required disabled class="w-full border border-slate-300 rounded-lg px-3 py-2.5 text-sm bg-white focus:border-brand outline-none"><option value="">-- Pilih PRK Dahulu --</option></select>
+                        </div>
+                        <div><label class="block text-xs font-bold text-slate-500 mb-1.5 uppercase tracking-wide">Komponen Pekerjaan</label>
+                            <select id="workflow-tender-pekerjaan" required disabled class="w-full border border-slate-300 rounded-lg px-3 py-2.5 text-sm bg-white focus:border-brand outline-none"><option value="">-- Pilih Pengadaan Terlebih Dahulu --</option></select>
                         </div>
                         <div>
                             <label class="block text-xs font-bold text-slate-500 mb-1.5 uppercase tracking-wide">Penyedia / Pemenang</label>
@@ -76,11 +90,14 @@ window.renderWorkflow = async function renderWorkflow() {
             <div id="workflow-koreksi" class="workflow-panel hidden p-6">
                 <form onsubmit="previewWorkflowKoreksi(event)" class="max-w-3xl space-y-5">
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div>
-                            <label class="block text-xs font-bold text-slate-500 mb-1.5 uppercase tracking-wide">Pekerjaan</label>
-                            <select id="workflow-koreksi-pekerjaan" onchange="loadWorkflowTenderSummary(this.value)" required class="w-full border border-slate-300 rounded-lg px-3 py-2.5 text-sm bg-white focus:border-brand outline-none">
-                                <option value="">-- Pilih Pekerjaan --</option>${pekerjaanOptions}
-                            </select>
+                        <div><label class="block text-xs font-bold text-slate-500 mb-1.5 uppercase tracking-wide">PRK</label>
+                            <select id="workflow-koreksi-prk" onchange="filterWorkflowPengadaan('koreksi', this.value)" required class="w-full border border-slate-300 rounded-lg px-3 py-2.5 text-sm bg-white focus:border-brand outline-none"><option value="">-- Pilih PRK --</option>${prkOptions}</select>
+                        </div>
+                        <div><label class="block text-xs font-bold text-slate-500 mb-1.5 uppercase tracking-wide">Pengadaan</label>
+                            <select id="workflow-koreksi-pengadaan" onchange="filterWorkflowPekerjaan('koreksi', this.value)" required disabled class="w-full border border-slate-300 rounded-lg px-3 py-2.5 text-sm bg-white focus:border-brand outline-none"><option value="">-- Pilih PRK Dahulu --</option></select>
+                        </div>
+                        <div><label class="block text-xs font-bold text-slate-500 mb-1.5 uppercase tracking-wide">Komponen Pekerjaan</label>
+                            <select id="workflow-koreksi-pekerjaan" onchange="loadWorkflowTenderSummary(this.value)" required disabled class="w-full border border-slate-300 rounded-lg px-3 py-2.5 text-sm bg-white focus:border-brand outline-none"><option value="">-- Pilih Pengadaan Terlebih Dahulu --</option></select>
                         </div>
                         <div class="bg-slate-50 rounded-lg border border-slate-200 p-3 text-sm">
                             <div class="flex justify-between"><span class="text-slate-500">Total HPS</span><strong id="workflow-koreksi-hps">Rp 0</strong></div>
@@ -94,11 +111,15 @@ window.renderWorkflow = async function renderWorkflow() {
             </div>
             <div id="workflow-pa" class="workflow-panel hidden p-6">
                 <div class="max-w-3xl">
-                    <label class="block text-xs font-bold text-slate-500 mb-1.5 uppercase tracking-wide">RAB Menunggu Persetujuan PA</label>
-                    <select id="workflow-pa-pekerjaan" onchange="loadWorkflowPASummary(this.value)" class="w-full border border-slate-300 rounded-lg px-3 py-2.5 text-sm bg-white focus:border-brand outline-none">
-                        <option value="">-- Pilih Pekerjaan --</option>
-                        ${window.workflowData.pekerjaan.filter(p => ['menunggu pa', 'rab terkoreksi'].includes(String(p.status || '').trim().toLowerCase())).map(p => `<option value="${p.id}">${p.nomor_paket || '-'} - ${p.nama_pekerjaan || '-'} (${String(p.status || 'Menunggu PA').trim()})</option>`).join('')}
-                    </select>
+                    <label class="block text-xs font-bold text-slate-500 mb-1.5 uppercase tracking-wide">RAB Menunggu Review & Finalisasi</label>
+                    <div class="space-y-4">
+                        <div><label class="block text-xs font-bold text-slate-500 mb-1.5 uppercase tracking-wide">Pilih PRK</label>
+                            <select id="workflow-pa-prk" onchange="filterWorkflowPengadaan('pa', this.value)" class="w-full border border-slate-300 rounded-lg px-3 py-2.5 text-sm bg-white focus:border-brand outline-none"><option value="">-- Pilih PRK --</option>${prkOptions}</select></div>
+                        <div><label class="block text-xs font-bold text-slate-500 mb-1.5 uppercase tracking-wide">Pilih Pengadaan</label>
+                            <select id="workflow-pa-pengadaan" onchange="filterWorkflowPekerjaan('pa', this.value)" disabled class="w-full border border-slate-300 rounded-lg px-3 py-2.5 text-sm bg-white focus:border-brand outline-none"><option value="">-- Pilih PRK Dahulu --</option></select></div>
+                        <div><label class="block text-xs font-bold text-slate-500 mb-1.5 uppercase tracking-wide">Pilih Komponen Pekerjaan</label>
+                            <select id="workflow-pa-pekerjaan" onchange="loadWorkflowPASummary(this.value)" disabled class="w-full border border-slate-300 rounded-lg px-3 py-2.5 text-sm bg-white focus:border-brand outline-none"><option value="">-- Pilih Pengadaan Terlebih Dahulu --</option></select></div>
+                    </div>
                     <div id="workflow-pa-summary" class="mt-5"></div>
                 </div>
             </div>
@@ -116,6 +137,51 @@ window.switchWorkflowTab = function switchWorkflowTab(tab) {
         button.className = `workflow-tab px-4 py-2 rounded-lg text-sm font-semibold ${active ? 'bg-brand text-white' : 'text-slate-600 hover:bg-white'}`;
     });
 };
+
+window.filterWorkflowPengadaan = function filterWorkflowPengadaan(tab, prkId) {
+    const pengadaanSelect = document.getElementById(`workflow-${tab}-pengadaan`);
+    const pekerjaanSelect = document.getElementById(`workflow-${tab}-pekerjaan`);
+    if (!pengadaanSelect || !pekerjaanSelect) return;
+
+    const programIds = new Set((window.workflowData?.program || [])
+        .filter(item => String(item.id_prk) === String(prkId))
+        .map(item => String(item.id)));
+    const rows = (window.workflowData?.pengadaan || []).filter(item =>
+        String(item.id_prk || item.prk_id || item.id_prk_program || '') === String(prkId) ||
+        programIds.has(String(item.id_jenis || item.jenis_id))
+    );
+    pengadaanSelect.innerHTML = `<option value="">-- Pilih Pengadaan --</option>${rows.map(item => `<option value="${item.id}">${item.nomor_pengadaan || item.nama_pengadaan || '-'}${item.nama_pengadaan && item.nomor_pengadaan ? ` - ${item.nama_pengadaan}` : ''}</option>`).join('')}`;
+    pengadaanSelect.disabled = !prkId;
+    pekerjaanSelect.innerHTML = '<option value="">-- Pilih Pengadaan Dahulu --</option>';
+    pekerjaanSelect.disabled = true;
+    const tableTarget = document.getElementById(`workflow-${tab}-table`);
+    if (tableTarget) tableTarget.innerHTML = '';
+};
+
+window.filterWorkflowPekerjaan = function filterWorkflowPekerjaan(tab, pengadaanId) {
+    const pekerjaanSelect = document.getElementById(`workflow-${tab}-pekerjaan`);
+    if (!pekerjaanSelect) return;
+
+    const isReview = tab === 'pa';
+    const eligibleStatuses = ['menunggu pa', 'menunggu finalisasi', 'rab terkoreksi'];
+    const pekerjaan = (window.workflowData?.pekerjaan || []).filter(item => {
+        const itemPengadaanId = item.pengadaan_id || item.id_pengadaan_prk;
+        const matchesPengadaan = String(itemPengadaanId) === String(pengadaanId);
+        const matchesStatus = !isReview || eligibleStatuses.includes(String(item.status || '').trim().toLowerCase());
+        return matchesPengadaan && matchesStatus;
+    });
+
+    pekerjaanSelect.innerHTML = `<option value="">-- Pilih Komponen Pekerjaan --</option>${pekerjaan.map(item => {
+        const status = String(item.status || '').trim().toLowerCase();
+        const statusLabel = isReview ? ` (${['menunggu pa', 'menunggu finalisasi'].includes(status) ? 'Menunggu Finalisasi' : 'RAB Terkoreksi'})` : '';
+        return `<option value="${item.id}">${item.nomor_paket || '-'} - ${item.nama_pekerjaan || item.nama_komponen || '-'}${statusLabel}</option>`;
+    }).join('')}`;
+    pekerjaanSelect.disabled = !pengadaanId;
+
+    const tableTarget = document.getElementById(`workflow-${tab}-table`);
+    if (tableTarget) tableTarget.innerHTML = '';
+    if (tab === 'koreksi') loadWorkflowTenderSummary('');
+}
 
 window.loadWorkflowHPS = function loadWorkflowHPS(pekerjaanId) {
     const target = document.getElementById('workflow-hps-table');
@@ -345,32 +411,44 @@ window.loadWorkflowPASummary = function loadWorkflowPASummary(pekerjaanId) {
     }
 
     const items = (window.workflowData?.rab || []).filter(item => String(item.pekerjaan_id) === String(pekerjaanId) && String(item.versi_rab || '').toLowerCase() === 'terkoreksi');
+    const hpsTotal = getWorkflowHPSItems(pekerjaanId).reduce((sum, item) => sum + workflowItemTotal(item), 0);
     const total = items.reduce((sum, item) => sum + workflowItemTotal(item), 0);
+    const selisih = hpsTotal - total;
+    const tender = getWorkflowTender(pekerjaanId);
+    const nilaiTender = tender ? Number(tender.nilai_penawaran) || 0 : 0;
     target.innerHTML = `
         <div class="bg-slate-50 border border-slate-200 rounded-xl p-4">
             <div class="flex justify-between text-sm"><span class="text-slate-500">Jumlah item RAB terkoreksi</span><strong>${items.length}</strong></div>
-            <div class="flex justify-between text-sm mt-2"><span class="text-slate-500">Nilai RAB kontrak</span><strong class="text-brand">${CONFIG.formatCurrency(total)}</strong></div>
-            <div class="mt-4">
-                <label class="block text-xs font-bold text-slate-500 mb-1.5 uppercase tracking-wide">Nilai Persetujuan PA (Rp)</label>
-                <input id="workflow-pa-nilai" type="number" min="0" step="any" value="${Number((window.workflowData.pekerjaan.find(item => String(item.id) === String(pekerjaanId)) || {}).nilai_pa) || total}" class="w-full border border-slate-300 rounded-lg px-3 py-2.5 text-sm focus:border-brand outline-none">
-            </div>
+            <div class="flex justify-between text-sm mt-2"><span class="text-slate-500">Total HPS Awal</span><strong>${CONFIG.formatCurrency(hpsTotal)}</strong></div>
+            <div class="flex justify-between text-sm mt-2"><span class="text-slate-500">Harga Terkoreksi</span><strong class="text-brand">${CONFIG.formatCurrency(total)}</strong></div>
+            <div class="flex justify-between text-sm mt-2"><span class="text-slate-500">Harga Penawaran</span><strong>${CONFIG.formatCurrency(nilaiTender)}</strong></div>
+            <div class="flex justify-between text-sm mt-2 pt-2 border-t border-slate-200"><span class="text-slate-500">Selisih HPS - Terkoreksi</span><strong class="${selisih >= 0 ? 'text-emerald-600' : 'text-rose-600'}">${CONFIG.formatCurrency(selisih)}</strong></div>
         </div>
-        <button type="button" onclick="approveWorkflowPA('${pekerjaanId}')" class="mt-4 bg-emerald-600 text-white px-5 py-2.5 rounded-lg text-sm font-semibold hover:bg-emerald-700 flex items-center gap-2"><i data-lucide="check-circle" class="w-4 h-4"></i> Simpan Nilai PA & Setujui</button>`;
+        <button type="button" onclick="saveWorkflowFinalisasi('${pekerjaanId}')" class="mt-4 bg-emerald-600 text-white px-5 py-2.5 rounded-lg text-sm font-semibold hover:bg-emerald-700 flex items-center gap-2"><i data-lucide="lock-keyhole" class="w-4 h-4"></i> Setuju & Kunci Data</button>`;
     lucide.createIcons();
 };
 
-window.approveWorkflowPA = async function approveWorkflowPA(pekerjaanId) {
-    const nilaiPA = Number(document.getElementById('workflow-pa-nilai')?.value) || 0;
-    if (nilaiPA <= 0) return showToast('Nilai persetujuan PA wajib diisi.', 'error');
+window.saveWorkflowFinalisasi = async function saveWorkflowFinalisasi(pekerjaanId) {
+    const finalItems = (window.workflowData?.rab || []).filter(item =>
+        String(item.pekerjaan_id) === String(pekerjaanId) &&
+        String(item.versi_rab || '').trim().toLowerCase() === 'terkoreksi'
+    );
+    const nilaiFinal = finalItems.reduce((sum, item) => sum + workflowItemTotal(item), 0);
+    if (nilaiFinal <= 0) return showToast('RAB terkoreksi belum tersedia atau nilainya masih Rp 0.', 'error');
 
     const result = await fetchAPI('', 'POST', {
         action: 'update',
         table: 'Pekerjaan',
-        data: { id: pekerjaanId, status: 'Disetujui PA', nilai_pa: nilaiPA }
+        data: {
+            id: pekerjaanId,
+            status: 'Siap Kontrak',
+            nilai_final: nilaiFinal,
+            tanggal_finalisasi: new Date().toISOString().slice(0, 10)
+        }
     });
     if (!result) return;
     invalidateCache('Pekerjaan');
-    showToast('RAB disetujui PA dan siap dibuatkan Kontrak');
+    showToast('Data berhasil dikunci dan siap dibuatkan Kontrak/SPK');
     renderWorkflow();
 };
 

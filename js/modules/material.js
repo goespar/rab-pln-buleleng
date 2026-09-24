@@ -5,18 +5,22 @@
 // ==========================================
 
 window.allMaterialList = [];
+window.materialInputData = { prk: [], program: [], pengadaan: [], pekerjaan: [] };
+window.materialBasket = [];
 
 window.renderMaterial = async function renderMaterial() {
-    // Ambil data Pekerjaan/Komponen untuk dropdown kategori
-    const pekerjaans = await fetchWithCache('Pekerjaan') || [];
-    let optKomponen = '<option value="">-- Tidak ada kategori / Standalone --</option>';
-    pekerjaans.forEach(p => {
-        if (p.id_pengadaan_prk && (p.nama_komponen || p.nama_pekerjaan)) {
-            optKomponen += '<option value="' + (p.id || '') + '" data-nama="' + (p.nama_komponen || p.nama_pekerjaan || '') + '">'
-                + (p.nama_komponen || p.nama_pekerjaan) + ' (ID: ' + p.id + ')</option>';
-        }
-    });
-    optKomponen += '<option value="manual">-- Isi Manual --</option>';
+    const [prk, program, pengadaan, pekerjaans] = await Promise.all([
+        fetchWithCache('prk'),
+        fetchWithCache('jenis_program'),
+        fetchWithCache('Pengadaan'),
+        fetchWithCache('Pekerjaan')
+    ]);
+    window.materialInputData = {
+        prk: prk || [],
+        program: program || [],
+        pengadaan: pengadaan || [],
+        pekerjaan: pekerjaans || []
+    };
 
     const contentArea = document.getElementById('app-content');
     contentArea.innerHTML = `
@@ -37,30 +41,38 @@ window.renderMaterial = async function renderMaterial() {
             <div id="material-table-container"><div class="flex justify-center py-12"><div class="loader"></div></div></div>
         </div>
 
-        <div id="modal-material" class="fixed inset-0 bg-slate-900/50 z-50 hidden flex items-center justify-center backdrop-blur-sm transition-opacity opacity-0 p-4">
-            <div class="bg-white rounded-2xl shadow-xl w-full max-w-lg p-6 transform scale-95 transition-all">
-                <div class="flex justify-between items-center mb-5 border-b border-slate-100 pb-4">
-                    <h3 id="modal-material-title" class="text-lg font-bold text-slate-800">Tambah Material Baru</h3>
+        <div id="modal-material" class="bg-slate-50 rounded-xl border border-slate-200 p-4 mb-4">
+            <div class="w-full">
+                <div class="flex justify-between items-center mb-3 border-b border-slate-200 pb-2">
+                    <h3 id="modal-material-title" class="text-base font-bold text-slate-800">Tambah Material Baru</h3>
                     <button type="button" onclick="closeModalMaterial()" class="text-slate-400 hover:text-slate-700 p-1"><i data-lucide="x" class="w-5 h-5"></i></button>
                 </div>
                 <form onsubmit="saveMaterial(event)">
-                    <div class="space-y-4">
-                        <div>
-                            <label class="block text-sm font-medium mb-1 text-slate-700">Nama Material / Uraian *</label>
+                    <div class="space-y-3">
+                        <div class="grid grid-cols-1 lg:grid-cols-2 gap-3">
+                            <div><label class="block text-xs font-semibold mb-1 text-slate-700">Nama Material / Uraian *</label>
                             <input type="text" id="mat-nama" required placeholder="Contoh: Kabel TIC 3 x 70 + 1 x 54.6 mm2" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm outline-none focus:border-brand">
+                            </div>
+                            <div><label class="block text-xs font-semibold mb-1 text-slate-700">Spesifikasi Teknis</label>
+                                <input type="text" id="mat-spek" placeholder="Contoh: SNI, XLPE, 20kV" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm outline-none focus:border-brand">
+                            </div>
                         </div>
-                        <div>
-                            <label class="block text-sm font-medium mb-1 text-slate-700">Komponen Pekerjaan (Opsional)</label>
-                            <select id="mat-kategori" onchange="handleKategoriChange()"
-                                class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm outline-none focus:border-brand bg-white">
-                                ${optKomponen}
-                            </select>
-                            <input type="text" id="mat-kategori-manual" placeholder="Ketik kategori custom..."
-                                class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm outline-none focus:border-brand mt-2 hidden">
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+                            <div><label class="block text-xs font-semibold mb-1 text-slate-700">PRK *</label>
+                                <select id="mat-prk" onchange="filterMaterialPengadaan(this.value)" required class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm outline-none focus:border-brand bg-white"><option value="">-- Pilih PRK --</option>${window.materialInputData.prk.map(item => `<option value="${item.id}">${item.no_prk || '-'} - ${item.prk || item.nama || '-'}</option>`).join('')}</select>
+                            </div>
+                            <div><label class="block text-xs font-semibold mb-1 text-slate-700">Pengadaan *</label>
+                                <select id="mat-pengadaan" onchange="filterMaterialKomponen(this.value)" required disabled class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm outline-none focus:border-brand bg-white"><option value="">-- Pilih PRK Dahulu --</option></select>
+                            </div>
+                            <div><label class="block text-xs font-semibold mb-1 text-slate-700">Komponen Pekerjaan *</label>
+                                <select id="mat-komponen" required disabled class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm outline-none focus:border-brand bg-white"><option value="">-- Pilih Pengadaan Dahulu --</option></select>
+                            </div>
                         </div>
-                        <div class="grid grid-cols-2 gap-4">
-                            <div>
-                                <label class="block text-sm font-medium mb-1 text-slate-700">Satuan *</label>
+                        <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+                            <div><label class="block text-xs font-semibold mb-1 text-slate-700">Volume</label>
+                                <input type="number" step="any" id="mat-volume" placeholder="Isi jika sudah diketahui" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm outline-none focus:border-brand">
+                            </div>
+                            <div><label class="block text-xs font-semibold mb-1 text-slate-700">Satuan *</label>
                                 <input type="text" id="mat-satuan" list="satuan-material-list" required placeholder="meter, btg, set" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm outline-none focus:border-brand">
                                 <datalist id="satuan-material-list">
                                     <option value="meter"></option><option value="btg"></option>
@@ -69,28 +81,30 @@ window.renderMaterial = async function renderMaterial() {
                                     <option value="lot"></option><option value="kg"></option>
                                 </datalist>
                             </div>
-                            <div>
-                                <label class="block text-sm font-medium mb-1 text-slate-700">Harga Material (Rp) *</label>
+                            <div><label class="block text-xs font-semibold mb-1 text-slate-700">Harga Material (Rp) *</label>
                                 <input type="number" id="mat-harga" required min="0" value="0"
                                     onfocus="if(this.value=='0')this.value=''" onblur="if(this.value=='')this.value='0'"
                                     class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm outline-none focus:border-brand">
                             </div>
-                        </div>
-                        <div>
-                            <label class="block text-sm font-medium mb-1 text-slate-700">Harga Jasa (Opsional, Rp)</label>
+                            <div><label class="block text-xs font-semibold mb-1 text-slate-700">Harga Jasa (Rp)</label>
                             <input type="number" id="mat-jasa" min="0" value="0"
                                 onfocus="if(this.value=='0')this.value=''" onblur="if(this.value=='')this.value='0'"
                                 class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm outline-none focus:border-brand">
+                            </div>
                         </div>
                     </div>
-                    <div class="mt-6 flex justify-end gap-3 pt-4 border-t border-slate-100">
-                        <button type="button" onclick="closeModalMaterial()" class="px-4 py-2 border border-slate-300 rounded-lg text-sm text-slate-600 hover:bg-slate-50">Batal</button>
-                        <button type="submit" id="btn-save-material" class="px-6 py-2 bg-brand text-white rounded-lg text-sm font-medium hover:bg-sky-700 transition">Simpan Material</button>
+                    <div class="mt-3 flex justify-end gap-2 pt-3 border-t border-slate-200">
+                        <button type="button" onclick="closeModalMaterial()" class="px-3 py-2 border border-slate-300 rounded-lg text-xs text-slate-600 hover:bg-slate-50">Bersihkan</button>
+                        <button type="submit" id="btn-save-material" class="px-6 py-2 bg-brand text-white rounded-lg text-sm font-medium hover:bg-sky-700 transition">Tambah ke Basket</button>
                     </div>
                 </form>
+                <div id="material-basket" class="mt-5"></div>
             </div>
         </div>
     `;
+    const materialForm = document.getElementById('modal-material');
+    const materialTable = document.getElementById('material-table-container');
+    if (materialForm && materialTable) materialTable.parentNode.insertBefore(materialForm, materialTable);
     lucide.createIcons();
     loadMaterialData();
 }
@@ -124,8 +138,9 @@ function renderMaterialRows(data) {
                 <thead class="bg-slate-100 text-slate-700 font-semibold">
                     <tr>
                         <th class="p-3 w-12 text-center">No</th>
-                        <th class="p-3">Kategori</th>
+                        <th class="p-3">Komponen Pekerjaan</th>
                         <th class="p-3">Nama Material</th>
+                        <th class="p-3 text-right">Volume</th>
                         <th class="p-3">Satuan</th>
                         <th class="p-3 text-right">Harga Material</th>
                         <th class="p-3 text-right">Harga Jasa</th>
@@ -137,6 +152,7 @@ function renderMaterialRows(data) {
     data.forEach((m, i) => {
         const nama     = m.material || m.nama_material || m.uraian || m.nama || m.item || '-';
         const kategori = m.kategori || m.keterangan || m.kelompok || 'Umum';
+        const volume   = parseFloat(m.volume) || 0;
         const satuan   = m.satuan || m.unit || '-';
         const hargaMat = parseFloat(m.harga) || parseFloat(m.harga_material) || parseFloat(m.harga_satuan) || 0;
         const hargaJasa= parseFloat(m.harga_jasa) || parseFloat(m.jasa) || 0;
@@ -146,6 +162,7 @@ function renderMaterialRows(data) {
                 <td class="p-3 text-center text-slate-500 font-medium">${i + 1}</td>
                 <td class="p-3"><span class="bg-blue-50 text-brand px-2.5 py-1 rounded-md text-xs font-semibold">${kategori}</span></td>
                 <td class="p-3 font-semibold text-slate-800">${nama}</td>
+                <td class="p-3 text-right">${volume}</td>
                 <td class="p-3 text-slate-600">${satuan}</td>
                 <td class="p-3 text-right font-medium text-emerald-600">${CONFIG.formatCurrency(hargaMat)}</td>
                 <td class="p-3 text-right text-slate-500">${CONFIG.formatCurrency(hargaJasa)}</td>
@@ -162,17 +179,33 @@ function renderMaterialRows(data) {
     lucide.createIcons();
 }
 
-function handleKategoriChange() {
-    const select = document.getElementById('mat-kategori');
-    const manual = document.getElementById('mat-kategori-manual');
-    if (select.value === 'manual') {
-        manual.classList.remove('hidden');
-        manual.focus();
-    } else {
-        manual.classList.add('hidden');
-        manual.value = '';
-    }
-}
+window.filterMaterialPengadaan = function filterMaterialPengadaan(prkId) {
+    const select = document.getElementById('mat-pengadaan');
+    const componentSelect = document.getElementById('mat-komponen');
+    if (!select || !componentSelect) return;
+
+    const programIds = new Set(window.materialInputData.program
+        .filter(item => String(item.id_prk) === String(prkId))
+        .map(item => String(item.id)));
+    const rows = window.materialInputData.pengadaan.filter(item =>
+        String(item.id_prk || item.prk_id || item.id_prk_program || '') === String(prkId) ||
+        programIds.has(String(item.id_jenis || item.jenis_id))
+    );
+    select.innerHTML = `<option value="">-- Pilih Pengadaan --</option>${rows.map(item => `<option value="${item.id}">${item.nomor_pengadaan || item.nama_pengadaan || '-'}${item.nomor_pengadaan && item.nama_pengadaan ? ` - ${item.nama_pengadaan}` : ''}</option>`).join('')}`;
+    select.disabled = !prkId;
+    componentSelect.innerHTML = '<option value="">-- Pilih Pengadaan Dahulu --</option>';
+    componentSelect.disabled = true;
+};
+
+window.filterMaterialKomponen = function filterMaterialKomponen(pengadaanId) {
+    const select = document.getElementById('mat-komponen');
+    if (!select) return;
+    const rows = window.materialInputData.pekerjaan.filter(item =>
+        String(item.pengadaan_id || item.id_pengadaan_prk) === String(pengadaanId)
+    );
+    select.innerHTML = `<option value="">-- Pilih Komponen Pekerjaan --</option>${rows.map(item => `<option value="${item.id}">${item.nama_komponen || item.nama_pekerjaan || '-'}</option>`).join('')}`;
+    select.disabled = !pengadaanId;
+};
 
 function filterMaterialTable() {
     const q = (document.getElementById('search-material')?.value || '').toLowerCase().trim();
@@ -191,29 +224,40 @@ function showModalMaterial(isEdit = false) {
     if (!modal) return;
     if (!isEdit) {
         state.editId = null;
-        document.getElementById('mat-kategori').value = '';
-        document.getElementById('mat-kategori-manual').value = '';
-        document.getElementById('mat-kategori-manual').classList.add('hidden');
+        window.materialBasket = [];
+        document.getElementById('mat-prk').value = '';
+        document.getElementById('mat-pengadaan').innerHTML = '<option value="">-- Pilih PRK Dahulu --</option>';
+        document.getElementById('mat-pengadaan').disabled = true;
+        document.getElementById('mat-komponen').innerHTML = '<option value="">-- Pilih Pengadaan Dahulu --</option>';
+        document.getElementById('mat-komponen').disabled = true;
         document.getElementById('mat-nama').value     = '';
+        document.getElementById('mat-spek').value     = '';
+        document.getElementById('mat-volume').value   = '';
         document.getElementById('mat-satuan').value   = '';
         document.getElementById('mat-harga').value    = '0';
         document.getElementById('mat-jasa').value     = '0';
         const titleEl = document.getElementById('modal-material-title');
         if (titleEl) titleEl.innerText = 'Tambah Material Baru';
+        renderMaterialBasket();
     } else {
         const titleEl = document.getElementById('modal-material-title');
         if (titleEl) titleEl.innerText = 'Edit Data Material';
+        const buttonEl = document.getElementById('btn-save-material');
+        if (buttonEl) buttonEl.innerText = 'Update Material';
+        renderMaterialBasket();
     }
-    modal.classList.remove('hidden');
-    setTimeout(() => { modal.classList.remove('opacity-0'); modal.querySelector('div')?.classList.remove('scale-95'); }, 10);
+    modal.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
 function closeModalMaterial() {
     const modal = document.getElementById('modal-material');
     if (!modal) return;
-    modal.classList.add('opacity-0');
-    modal.querySelector('div')?.classList.add('scale-95');
-    setTimeout(() => modal.classList.add('hidden'), 200);
+    if (!state.editId) {
+        window.materialBasket = [];
+        renderMaterialBasket();
+        document.getElementById('mat-nama').value = '';
+    }
+    modal.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
 async function editMaterial(id) {
@@ -222,22 +266,27 @@ async function editMaterial(id) {
     if (!item) return showToast('Data material tidak ditemukan', 'error');
 
     state.editId = item.id || id;
-    document.getElementById('mat-kategori').value = item.kategori || item.keterangan || item.kelompok || item.id_komponen || '';
-    const manualField = document.getElementById('mat-kategori-manual');
-    // Jika data lama berisi text custom (bukan ID), tampilkan di manual field
-    const kategoriVal = item.kategori || item.keterangan || item.kelompok || '';
-    if (kategoriVal && !kategoriVal.match(/^[0-9a-zA-Z\-]+$/) || (kategoriVal && !pekerjaans?.some(p => String(p.id) === kategoriVal))) {
-        document.getElementById('mat-kategori').value = 'manual';
-        manualField.value = kategoriVal;
-        manualField.classList.remove('hidden');
-    } else {
-        manualField.classList.add('hidden');
-    }
+    window.materialBasket = [];
     document.getElementById('mat-nama').value     = item.material || item.nama_material || item.uraian || item.nama || item.item || '';
+    document.getElementById('mat-spek').value     = item.spesifikasi || '';
+    document.getElementById('mat-volume').value   = item.volume || '';
     document.getElementById('mat-satuan').value   = item.satuan || item.unit || '';
     document.getElementById('mat-harga').value    = item.harga || item.harga_material || item.harga_satuan || '0';
     document.getElementById('mat-jasa').value     = item.harga_jasa || item.jasa || '0';
     showModalMaterial(true);
+    const component = window.materialInputData.pekerjaan.find(row => String(row.id) === String(item.id_komponen));
+    const pengadaanId = component ? (component.pengadaan_id || component.id_pengadaan_prk) : '';
+    const pengadaan = window.materialInputData.pengadaan.find(row => String(row.id) === String(pengadaanId));
+    const program = window.materialInputData.program.find(row => String(row.id) === String(pengadaan?.id_jenis || pengadaan?.jenis_id));
+    const prkId = program?.id_prk || pengadaan?.id_prk || pengadaan?.prk_id || '';
+    const prkSelect = document.getElementById('mat-prk');
+    if (prkSelect && prkId) {
+        prkSelect.value = prkId;
+        filterMaterialPengadaan(prkId);
+        document.getElementById('mat-pengadaan').value = pengadaanId;
+        filterMaterialKomponen(pengadaanId);
+        document.getElementById('mat-komponen').value = item.id_komponen || '';
+    }
 }
 
 async function saveMaterial(e) {
@@ -245,42 +294,92 @@ async function saveMaterial(e) {
     const btn = document.getElementById('btn-save-material');
     if (btn) { btn.disabled = true; btn.innerHTML = '⏳ Menyimpan...'; }
 
-    const kategoriVal = document.getElementById('mat-kategori').value.trim();
-    const kategoriManualVal = document.getElementById('mat-kategori-manual').value.trim();
-    const kategoriFinał = kategoriVal === 'manual' ? kategoriManualVal : kategoriVal || 'Umum';
+    const komponenId = document.getElementById('mat-komponen').value;
+    const komponen = window.materialInputData.pekerjaan.find(item => String(item.id) === String(komponenId));
     const namaVal     = document.getElementById('mat-nama').value.trim();
+    const spekVal     = document.getElementById('mat-spek').value.trim();
+    const volumeVal   = parseFloat(document.getElementById('mat-volume').value) || 0;
     const satuanVal   = document.getElementById('mat-satuan').value.trim() || 'set';
     const hargaVal    = parseFloat(document.getElementById('mat-harga').value) || 0;
     const jasaVal     = parseFloat(document.getElementById('mat-jasa').value) || 0;
 
-    if (!namaVal) {
-        showToast('Nama Material / Uraian wajib diisi', 'error');
-        if (btn) { btn.disabled = false; btn.innerHTML = 'Simpan Material'; }
+    if (!komponenId || !komponen || !namaVal) {
+        showToast('Pilih PRK, Pengadaan, Komponen, dan isi nama material.', 'error');
+        if (btn) { btn.disabled = false; btn.innerHTML = state.editId ? 'Update Material' : 'Tambah ke Basket'; }
         return;
     }
 
-    const payload = {
-        action: state.editId ? 'update' : 'create',
-        table: 'Material',
-        user: state.currentUser ? state.currentUser.nama : 'Admin',
-        data: {
+    const data = {
             material: namaVal, nama_material: namaVal, nama: namaVal, uraian: namaVal,
             satuan: satuanVal,
             harga: hargaVal, harga_material: hargaVal, harga_satuan: hargaVal,
-            kategori: kategoriFinał, keterangan: kategoriFinał,
-            id_komponen: kategoriVal !== 'manual' && kategoriVal ? kategoriVal : '',
+            kategori: komponen.nama_komponen || komponen.nama_pekerjaan || 'PRK',
+            keterangan: komponen.nama_komponen || komponen.nama_pekerjaan || 'PRK',
+            id_komponen: komponenId,
+            pengadaan_id: document.getElementById('mat-pengadaan').value,
+            id_pengadaan_prk: document.getElementById('mat-pengadaan').value,
+            spesifikasi: spekVal,
+            volume: volumeVal,
             harga_jasa: jasaVal, jasa: jasaVal,
-            jumlah: 1, total: hargaVal
-        }
+            jumlah: volumeVal,
+            total_harga: volumeVal * (hargaVal + jasaVal),
+            total: volumeVal > 0 ? volumeVal * (hargaVal + jasaVal) : hargaVal
     };
-    if (state.editId) { payload.id = state.editId; payload.data.id = state.editId; }
+
+    if (!state.editId) {
+        window.materialBasket.push({ ...data, id: `temp_${Date.now()}_${window.materialBasket.length}` });
+        renderMaterialBasket();
+        document.getElementById('mat-nama').value = '';
+        document.getElementById('mat-spek').value = '';
+        document.getElementById('mat-volume').value = '';
+        showToast('Material ditambahkan ke basket');
+        if (btn) { btn.disabled = false; btn.innerHTML = 'Tambah ke Basket'; }
+        return;
+    }
+
+    const payload = { action: 'update', table: 'Material', user: state.currentUser ? state.currentUser.nama : 'Admin', data: { id: state.editId, ...data } };
 
     const res = await fetchAPI('', 'POST', payload);
-    if (btn) { btn.disabled = false; btn.innerHTML = 'Simpan Material'; }
+    if (btn) { btn.disabled = false; btn.innerHTML = 'Update Material'; }
     if (res) {
-        showToast(state.editId ? 'Data Material berhasil diperbarui' : 'Data Material berhasil disimpan');
+        showToast('Data Material berhasil diperbarui');
         closeModalMaterial();
         loadMaterialData();
     }
 }
+
+function renderMaterialBasket() {
+    const target = document.getElementById('material-basket');
+    if (!target) return;
+    if (!window.materialBasket.length) {
+        target.innerHTML = '<div class="p-4 text-center text-slate-400 border border-dashed rounded-lg text-sm">Basket masih kosong.</div>';
+        return;
+    }
+    target.innerHTML = `<div class="border border-slate-200 rounded-lg overflow-hidden"><div class="p-3 bg-slate-50 flex justify-between items-center"><strong class="text-sm text-slate-700">Basket Material (${window.materialBasket.length})</strong><button type="button" onclick="saveMaterialBasket()" class="bg-emerald-600 text-white px-3 py-1.5 rounded-lg text-xs font-semibold">Simpan Semua ke Sheet</button></div><div class="overflow-x-auto"><table class="w-full text-xs"><thead class="bg-slate-100"><tr><th class="p-2 text-left">Komponen</th><th class="p-2 text-left">Material / Spesifikasi</th><th class="p-2 text-right">Volume</th><th class="p-2 text-left">Satuan</th><th class="p-2 text-right">Harga Material</th><th class="p-2 text-right">Harga Jasa</th><th class="p-2 text-right">Total</th><th class="p-2 text-center">Aksi</th></tr></thead><tbody class="divide-y divide-slate-100">${window.materialBasket.map((item, index) => { const volume = Number(item.volume) || 0; const hargaMaterial = Number(item.harga) || 0; const hargaJasa = Number(item.harga_jasa) || 0; const total = volume * (hargaMaterial + hargaJasa); return `<tr><td class="p-2">${item.kategori}</td><td class="p-2 font-medium">${item.material}${item.spesifikasi ? `<br><span class="text-slate-400">${item.spesifikasi}</span>` : ''}</td><td class="p-2 text-right">${volume || 0}</td><td class="p-2">${item.satuan || '-'}</td><td class="p-2 text-right">${CONFIG.formatCurrency(hargaMaterial)}</td><td class="p-2 text-right text-amber-700">${CONFIG.formatCurrency(hargaJasa)}</td><td class="p-2 text-right font-semibold text-emerald-700">${CONFIG.formatCurrency(total)}</td><td class="p-2 text-center"><button type="button" onclick="removeMaterialBasket(${index})" class="text-red-500">Hapus</button></td></tr>`; }).join('')}</tbody></table></div></div>`;
+}
+
+window.removeMaterialBasket = function removeMaterialBasket(index) {
+    window.materialBasket.splice(index, 1);
+    renderMaterialBasket();
+};
+
+window.saveMaterialBasket = async function saveMaterialBasket() {
+    if (!window.materialBasket.length) return showToast('Basket material masih kosong.', 'error');
+    const currentUser = state.currentUser ? state.currentUser.nama : 'Admin';
+    const items = window.materialBasket.map(item => ({ ...item, id: undefined }));
+    const result = await fetchAPI('', 'POST', {
+        action: 'simpanMaterialBatch',
+        table: 'Material',
+        user: currentUser,
+        dataMaterial: items
+    });
+    if (result) {
+        showToast(`${items.length} material berhasil disimpan ke Sheet`);
+        window.materialBasket = [];
+        closeModalMaterial();
+        loadMaterialData();
+    } else {
+        showToast('Material gagal disimpan ke Sheet.', 'error');
+    }
+};
 

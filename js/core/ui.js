@@ -45,6 +45,7 @@ function navigate(page) {
     const titles = {
         'dashboard'  : 'Dashboard',
         'prk'        : 'Program Rencana Kerja (PRK)',
+        'disburse'   : 'Input Disburse',
         'rab'        : 'INPUT RAB',
         'workflow'   : 'Tender & Koreksi RAB',
         'rekap'      : 'Rekap RAB Komponen',
@@ -80,6 +81,7 @@ function navigate(page) {
     switch (page) {
         case 'dashboard'  : renderDashboard();  break;
         case 'prk'        : renderPRK();         break;
+        case 'disburse'   : renderDisburse();    break;
         case 'rab'        : renderRAB();         break;
         case 'workflow'   : renderWorkflow();    break;
         case 'rekap'      : renderRekap();       break;

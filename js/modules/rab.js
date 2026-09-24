@@ -810,24 +810,20 @@ function printRABEstimator() {
     // Get pekerjaan info
     const pekerjaan = state.selectedPekerjaanNamaRAB || 'Pekerjaan';
     const pengadaan = state.selectedPengadaanNamaRAB || 'Pengadaan';
+    const lokasi = document.getElementById('info-lokasi-manual')?.value.trim() || '-';
     
     // Get PRK info
     let noPrk = '-';
     let urianPrk = '-';
-    
-    if (window.allPengadaanList && state.selectedPengadaanIdRAB) {
-        const pgData = window.allPengadaanList.find(p => String(p.id) === String(state.selectedPengadaanIdRAB));
-        if (pgData) {
-            const prkId = pgData.id_prk || pgData.prk_id || pgData.id_program_rencana_kerja;
-            if (prkId && window.allPRKList && window.allPRKList.length > 0) {
-                const prkData = window.allPRKList.find(p => String(p.id) === String(prkId));
-                if (prkData) {
-                    noPrk = prkData.no_prk || prkData.nomor_prk || '-';
-                    // Tambahkan prkData.prk sebagai priority pertama (field yang dipakai di dropdown)
-                    urianPrk = prkData.prk || prkData.nama || prkData.uraian || prkData.nama_prk || prkData.uraian_prk || '-';
-                }
-            }
-        }
+
+    const selectedPekerjaan = (window.allPekerjaanList || []).find(item => String(item.id) === String(state.selectedPekerjaanRAB));
+    const pgData = (window.allPengadaanList || []).find(item => String(item.id) === String(state.selectedPengadaanIdRAB || selectedPekerjaan?.pengadaan_id || selectedPekerjaan?.id_pengadaan_prk));
+    const jenisProgram = (window.allJenisProgramList || []).find(item => String(item.id) === String(pgData?.id_jenis || pgData?.jenis_id));
+    const prkId = pgData?.id_prk || pgData?.prk_id || pgData?.id_program_rencana_kerja || jenisProgram?.id_prk || selectedPekerjaan?.id_prk;
+    const prkData = (window.allPRKList || []).find(item => String(item.id) === String(prkId));
+    if (prkData) {
+        noPrk = prkData.no_prk || prkData.nomor_prk || '-';
+        urianPrk = prkData.prk || prkData.nama || prkData.uraian || prkData.nama_prk || prkData.uraian_prk || '-';
     }
     
     // Format PRK display
@@ -965,7 +961,7 @@ function printRABEstimator() {
     <div class="project-info">
         <div><label>Pekerjaan</label>: <span class="value">${pekerjaan}</span></div>
         <div><label>Pengadaan</label>: <span class="value">${pengadaan}</span></div>
-        <div><label>Lokasi</label>: <span style="border-bottom: 1px dotted #666; display:inline-block; width:35%; padding-bottom:1px;"></span></div>
+        <div><label>Lokasi</label>: <span class="value">${lokasi}</span></div>
         <div><label>Pos Anggaran</label>: <span class="value">${displayPrk}</span></div>
     </div>
     
@@ -990,27 +986,11 @@ function printRABEstimator() {
     
     <!-- Summary Section -->
     <div class="summary-container">
-        <!-- LEFT: Empty -->
-        <div class="summary-left">
-        </div>
-        
-        <!-- RIGHT: Jumlah, DPP, PPN, Total -->
+        <div class="summary-left"></div>
         <div class="summary-right">
-            <div class="summary-item" style="border-bottom: 1px solid #d1d5db; padding-bottom: 6px; margin-bottom: 6px;">
-                <label>JUMLAH</label>
-                <span class="amount">${fmtSubtotal}</span>
-            </div>
-            <div class="summary-item" style="border-bottom: 1px solid #d1d5db; padding-bottom: 6px; margin-bottom: 6px;">
-                <label>DPP (11/12)</label>
-                <span class="amount">${CONFIG.formatCurrency(subtotal * (11/12))}</span>
-            </div>
-            <div class="summary-item" style="border-bottom: 1px solid #d1d5db; padding-bottom: 6px; margin-bottom: 6px;">
-                <label>PPN (12%)</label>
-                <span class="amount">${CONFIG.formatCurrency((subtotal * (11/12)) * 0.12)}</span>
-            </div>
             <div class="total-row">
-                <label>TOTAL ANGGARAN</label>
-                <span class="amount">${CONFIG.formatCurrency(Math.round(subtotal + ((subtotal * (11/12)) * 0.12)))}</span>
+                <label>JUMLAH RAB</label>
+                <span class="amount">${fmtSubtotal}</span>
             </div>
         </div>
     </div>

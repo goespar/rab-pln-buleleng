@@ -597,8 +597,8 @@ function buildPrintTemplateKomponen(pekerjaanElements) {
         
         .title { text-align: center; font-size: 13px; font-weight: bold; margin: 5px 0; text-transform: uppercase; }
         
-        .page-break { page-break-after: always; margin-bottom: 30px; }
-        .pekerjaan-item { margin-bottom: 10px; }
+        .page-break { page-break-after: auto; margin-bottom: 10px; }
+        .pekerjaan-item { margin-bottom: 10px; break-inside: avoid; page-break-inside: avoid; }
         
         .pekerjaan-header { background-color: #1f2937; color: white; padding: 12px 16px; margin-bottom: 0; }
         .pekerjaan-header h4 { font-size: 12px; font-weight: bold; margin: 0 0 8px 0; }
@@ -625,9 +625,9 @@ function buildPrintTemplateKomponen(pekerjaanElements) {
         .summary-box-label { font-size: 9px; color: #6b7280; margin-bottom: 4px; }
         .summary-box-value { font-size: 12px; font-weight: bold; color: #1f2937; font-family: monospace; }
         
-        .footer { margin-top: 3px; display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px; font-size: 9px; }
+        .footer { margin-top: 14px; padding-top: 8px; border-top: 1px solid #9ca3af; display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px; font-size: 9px; break-inside: avoid; page-break-inside: avoid; }
         .sign-box { text-align: center; }
-        .sign-box-space { height: 10px; }
+        .sign-box-space { height: 45px; }
         .sign-box-line { border-bottom: 1px solid #000; margin-bottom: 2px; }
         .sign-box p { margin: 0; font-weight: bold; font-size: 9px; }
     </style>

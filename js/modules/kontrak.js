@@ -215,7 +215,7 @@ function applyTenderToKontrak(tenderId) {
     const namaPenyedia = penyedia?.nama || penyedia?.nama_penyedia || penyedia?.nama_perusahaan || '';
     if (penyediaSelect) penyediaSelect.value = namaPenyedia;
     const nilaiEl = document.getElementById('kontrak-nilai');
-    if (nilaiEl) nilaiEl.value = Number(pekerjaan?.nilai_pa) || Number(tender.nilai_penawaran) || 0;
+    if (nilaiEl) nilaiEl.value = Number(pekerjaan?.nilai_final) || Number(pekerjaan?.nilai_pa) || Number(tender.nilai_penawaran) || 0;
 }
 
 function closeModalKontrak() {
@@ -302,9 +302,10 @@ async function saveKontrak(event) {
         return showToast('Pekerjaan tidak ditemukan. Silakan pilih ulang pekerjaan.', 'error');
     }
 
-    if (String(pekerjaanTerpilih.status || '').trim().toLowerCase() !== 'disetujui pa') {
+    const statusPekerjaan = String(pekerjaanTerpilih.status || '').trim().toLowerCase();
+    if (!['siap kontrak', 'disetujui pa'].includes(statusPekerjaan)) {
         if (btn) { btn.disabled = false; btn.innerHTML = 'Simpan Kontrak'; }
-        return showToast('Kontrak hanya dapat dibuat setelah disetujui PA.', 'error');
+        return showToast('Kontrak hanya dapat dibuat setelah data RAB difinalisasi.', 'error');
     }
 
     data.pekerjaan_id = pekerjaanTerpilih.id;

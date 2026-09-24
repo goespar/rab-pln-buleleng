@@ -36,6 +36,12 @@ function doPost(e) {
         cekLimitRealisasi(payload.pekerjaan_id, payload.nilai_termin_baru, payload.realisasi_id)
       );
     }
+
+    if (action === 'simpanMaterialBatch') {
+      return createJsonResponse(
+        simpanMaterialBatch(payload.dataMaterial)
+      );
+    }
     
     var ss = SpreadsheetApp.getActiveSpreadsheet();
     var sheet = ss.getSheetByName(table);
@@ -129,6 +135,37 @@ function getTableData(tableName) {
     if (!rowEmpty) result.push(obj);
   }
   return result;
+}
+
+function simpanMaterialBatch(dataMaterial) {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var materialSheet = ss.getSheetByName('Material');
+  if (!materialSheet) throw new Error("Sheet 'Material' tidak ditemukan.");
+  if (!Array.isArray(dataMaterial) || dataMaterial.length === 0) {
+    throw new Error('Basket material tidak boleh kosong.');
+  }
+
+  var headers = getHeaders(materialSheet);
+  if (headers.length === 0) throw new Error("Header Sheet 'Material' belum tersedia.");
+  var rows = dataMaterial.map(function (item) {
+    var rowData = {};
+    Object.keys(item || {}).forEach(function (key) {
+      rowData[String(key).toLowerCase().trim()] = item[key];
+    });
+    rowData.id = 'ID_' + new Date().getTime() + Math.floor(Math.random() * 1000);
+    if (rowData.created_at === undefined) rowData.created_at = new Date();
+    return headers.map(function (header) {
+      var headerName = String(header).toLowerCase().trim();
+      return rowData[headerName] !== undefined ? rowData[headerName] : '';
+    });
+  });
+
+  materialSheet.getRange(materialSheet.getLastRow() + 1, 1, rows.length, headers.length).setValues(rows);
+  return {
+    success: true,
+    message: 'Material batch berhasil disimpan.',
+    jumlah_disimpan: rows.length
+  };
 }
 
 function simpanRABTerkoreksi(pekerjaan_id, dataKoreksi) {

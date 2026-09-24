@@ -134,10 +134,10 @@ async function loadPekerjaanData() {
                 tombolWorkflow = `<button onclick="handlePekerjaanAction('tender', '${p.id}')" class="text-emerald-600 hover:text-emerald-800 text-[10px] font-semibold">Tender</button>`;
             } else if (statusPekerjaan === 'tender selesai') {
                 tombolWorkflow = `<button onclick="handlePekerjaanAction('koreksi-rab', '${p.id}')" class="text-amber-600 hover:text-amber-800 text-[10px] font-semibold">Koreksi RAB</button>`;
-            } else if (statusPekerjaan === 'menunggu pa' || statusPekerjaan === 'rab terkoreksi') {
-                const actionLabel = statusPekerjaan === 'rab terkoreksi' ? 'Kirim ke PA' : 'Review PA';
+            } else if (['menunggu pa', 'menunggu finalisasi', 'rab terkoreksi'].includes(statusPekerjaan)) {
+                const actionLabel = statusPekerjaan === 'rab terkoreksi' ? 'Review Finalisasi' : 'Finalisasi';
                 tombolWorkflow = `<button onclick="handlePekerjaanAction('review-pa', '${p.id}')" class="text-amber-600 hover:text-amber-800 text-[10px] font-semibold">${actionLabel}</button>`;
-            } else if (statusPekerjaan === 'disetujui pa') {
+            } else if (statusPekerjaan === 'siap kontrak' || statusPekerjaan === 'disetujui pa') {
                 tombolWorkflow = `<button onclick="handlePekerjaanAction('buat-kontrak', '${p.id}')" class="text-brand hover:text-sky-700 text-[10px] font-semibold">Buat Kontrak</button>`;
             }
 
@@ -172,13 +172,27 @@ window.handlePekerjaanAction = async function handlePekerjaanAction(action, peke
         const pekerjaanList = await fetchWithCache('Pekerjaan');
         const pekerjaan = (pekerjaanList || []).find(item => String(item.id) === String(pekerjaanId));
         if (String(pekerjaan?.status || '').toLowerCase() === 'rab terkoreksi') {
-            const result = await fetchAPI('', 'POST', { action: 'update', table: 'Pekerjaan', data: { id: pekerjaanId, status: 'Menunggu PA' } });
+            const result = await fetchAPI('', 'POST', { action: 'update', table: 'Pekerjaan', data: { id: pekerjaanId, status: 'Menunggu Finalisasi' } });
             if (!result) return;
             invalidateCache('Pekerjaan');
         }
         navigate('workflow');
         setTimeout(() => {
             switchWorkflowTab('pa');
+            const pengadaanId = pekerjaan?.pengadaan_id || pekerjaan?.id_pengadaan_prk || '';
+            const pengadaan = (window.workflowData?.pengadaan || []).find(item => String(item.id) === String(pengadaanId));
+            const program = (window.workflowData?.program || []).find(item => String(item.id) === String(pengadaan?.id_jenis || pengadaan?.jenis_id));
+            const prkId = program?.id_prk || pengadaan?.id_prk || pengadaan?.prk_id || '';
+            const prkSelect = document.getElementById('workflow-pa-prk');
+            if (prkSelect) {
+                prkSelect.value = prkId;
+                filterWorkflowPengadaan('pa', prkId);
+            }
+            const pengadaanSelect = document.getElementById('workflow-pa-pengadaan');
+            if (pengadaanSelect) {
+                pengadaanSelect.value = pengadaanId;
+                filterWorkflowPekerjaan('pa', pengadaanId);
+            }
             const select = document.getElementById('workflow-pa-pekerjaan');
             if (select) {
                 select.value = pekerjaanId;
