@@ -65,7 +65,7 @@ window.renderRekapRabPengadaan = async function renderRekapRabPengadaan() {
         .map(pg => {
             const pekerjaanList = pekerjaanByPengadaan[String(pg.id)] || [];
             const pekWithRAB = pekerjaanList.map(p => {
-                const rabItems = rabByPekerjaan[String(p.id)] || [];
+                const rabItems = getActiveRABItems(rabByPekerjaan[String(p.id)] || []);
                 const totals = calcTotals(rabItems);
                 const isJTM = (p.jenis_tegangan || '').toUpperCase() === 'JTM';
                 const isJTR = (p.jenis_tegangan || '').toUpperCase() === 'JTR';
@@ -90,7 +90,7 @@ window.renderRekapRabPengadaan = async function renderRekapRabPengadaan() {
     });
 
     const pekerjaanWithRAB = allPekerjaan.map(p => {
-        const rabItems = rabByPekerjaan[String(p.id)] || [];
+        const rabItems = getActiveRABItems(rabByPekerjaan[String(p.id)] || []);
         const totals   = calcTotals(rabItems);
         const isJTM    = (p.jenis_tegangan || '').toUpperCase() === 'JTM';
         const isJTR    = (p.jenis_tegangan || '').toUpperCase() === 'JTR';

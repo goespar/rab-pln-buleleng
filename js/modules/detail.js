@@ -221,7 +221,7 @@ async function loadDetailTabRingkasan(container, item) {
 async function loadDetailTabRAB(container, item) {
     container.innerHTML = '<div class="flex justify-center py-12"><div class="loader"></div></div>';
     const rabList  = await fetchAPI('action=list&table=RAB') || [];
-    const rabItems = rabList.filter(r => String(r.pekerjaan_id) === String(item.id));
+    const rabItems = getActiveRABItems(rabList.filter(r => String(r.pekerjaan_id) === String(item.id)));
     let totalRAB = 0, rows = '';
     if (rabItems.length === 0) {
         rows = '<tr><td colspan="8" class="px-4 py-8 text-center text-slate-400 italic">Belum ada data RAB.</td></tr>';

@@ -53,7 +53,7 @@ window.renderRekap = async function renderRekap() {
     // Build pekerjaan list dengan RAB items
     const pekerjaanWithData = allPekerjaan
         .map(p => {
-            const rabItems = rabByPekerjaan[String(p.id)] || [];
+                const rabItems = getActiveRABItems(rabByPekerjaan[String(p.id)] || []);
             if (rabItems.length === 0) return null;
             
             const totals = calcTotals(rabItems);

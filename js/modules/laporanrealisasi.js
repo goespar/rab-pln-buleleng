@@ -31,8 +31,7 @@ window.renderLaporanRealisasi = async function renderLaporanRealisasi() {
         const prkItem = prk.find(row => String(row.id) === String(prkId));
         const pekerjaanItems = pekerjaan.filter(row => String(row.pengadaan_id || row.id_pengadaan_prk) === String(item.id));
         const pekerjaanIds = new Set(pekerjaanItems.map(row => String(row.id)));
-        const totalRAB = rab.filter(row => pekerjaanIds.has(String(row.pekerjaan_id)) && String(row.versi_rab || '').toLowerCase() !== 'terkoreksi')
-            .reduce((sum, row) => sum + (Number(row.jumlah) || ((Number(row.volume) || 0) * ((Number(row.harga_material) || 0) + (Number(row.harga_jasa) || 0)))), 0);
+        const totalRAB = Array.from(pekerjaanIds).reduce((sum, pekerjaanId) => sum + getActiveRABItems(rab.filter(row => String(row.pekerjaan_id) === pekerjaanId)).reduce((itemSum, row) => itemSum + (Number(row.jumlah) || ((Number(row.volume) || 0) * ((Number(row.harga_material) || 0) + (Number(row.harga_jasa) || 0)))), 0), 0);
         const totalPA = pekerjaanItems.reduce((sum, row) => sum + (Number(row.nilai_pa) || 0), 0);
         const totalKontrak = kontrak.filter(row => pekerjaanIds.has(String(row.pekerjaan_id)))
             .reduce((sum, row) => sum + (Number(row.nilai_kontrak) || 0), 0);

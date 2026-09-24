@@ -400,7 +400,7 @@ async function handleSelectPekerjaanRAB(id) {
     if (sectionRAB) sectionRAB.classList.remove('hidden');
     
     const allRAB    = await fetchAPI('action=list&table=RAB') || [];
-    const existingRAB = allRAB.filter(item => String(item.pekerjaan_id) === String(id));
+    const existingRAB = allRAB.filter(item => String(item.pekerjaan_id) === String(id) && String(item.versi_rab || '').trim().toLowerCase() !== 'terkoreksi');
     state.tempRABItems = existingRAB.map(item => ({
         id:             item.id || 'temp_' + Date.now(),
         kategori:       item.kategori || 'Umum',

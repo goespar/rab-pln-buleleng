@@ -143,13 +143,30 @@ function simpanRABTerkoreksi(pekerjaan_id, dataKoreksi) {
     throw new Error('Data koreksi RAB tidak boleh kosong.');
   }
 
+  var rabData = rabSheet.getDataRange().getValues();
   var rabHeaders = getHeaders(rabSheet);
+  var idIndex = cariIndexKolom(rabHeaders, ['id']);
+  var pekerjaanIdIndex = cariIndexKolom(rabHeaders, ['pekerjaan_id']);
+  var versiIndex = cariIndexKolom(rabHeaders, ['versi_rab']);
+  if (idIndex === -1 || pekerjaanIdIndex === -1 || versiIndex === -1) {
+    throw new Error("Sheet RAB wajib memiliki kolom 'id', 'pekerjaan_id', dan 'versi_rab'.");
+  }
+
+  var correctedRows = [];
+  for (var r = 1; r < rabData.length; r++) {
+    if (String(rabData[r][pekerjaanIdIndex]) === String(pekerjaan_id) &&
+        String(rabData[r][versiIndex] || '').trim().toLowerCase() === 'terkoreksi') {
+      correctedRows.push(r + 1);
+    }
+  }
+
   var rabRows = dataKoreksi.map(function (item) {
     var rowData = {};
     Object.keys(item || {}).forEach(function (key) {
       rowData[String(key).toLowerCase().trim()] = item[key];
     });
 
+    rowData.id = rowData.id || ('ID_' + new Date().getTime() + Math.floor(Math.random() * 1000));
     rowData.pekerjaan_id = pekerjaan_id;
     rowData.versi_rab = 'Terkoreksi';
     if (rowData.created_at === undefined) rowData.created_at = new Date();
@@ -160,12 +177,17 @@ function simpanRABTerkoreksi(pekerjaan_id, dataKoreksi) {
     });
   });
 
-  rabSheet.getRange(
-    rabSheet.getLastRow() + 1,
-    1,
-    rabRows.length,
-    rabHeaders.length
-  ).setValues(rabRows);
+  var commonRows = Math.min(correctedRows.length, rabRows.length);
+  for (var i = 0; i < commonRows; i++) {
+    rabSheet.getRange(correctedRows[i], 1, 1, rabHeaders.length).setValues([rabRows[i]]);
+  }
+  for (var deleteIndex = correctedRows.length - 1; deleteIndex >= rabRows.length; deleteIndex--) {
+    rabSheet.deleteRow(correctedRows[deleteIndex]);
+  }
+  if (rabRows.length > commonRows) {
+    rabSheet.getRange(rabSheet.getLastRow() + 1, 1, rabRows.length - commonRows, rabHeaders.length)
+      .setValues(rabRows.slice(commonRows));
+  }
 
   var pekerjaanData = pekerjaanSheet.getDataRange().getValues();
   var pekerjaanHeaders = pekerjaanData[0];

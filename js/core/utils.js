@@ -10,6 +10,14 @@ function formatShortCurrency(amount) {
     return CONFIG.formatCurrency(amount);
 }
 
+function getActiveRABItems(items) {
+    const rabItems = Array.isArray(items) ? items : [];
+    const correctedItems = rabItems.filter(item => String(item.versi_rab || '').trim().toLowerCase() === 'terkoreksi');
+    return correctedItems.length > 0
+        ? correctedItems
+        : rabItems.filter(item => String(item.versi_rab || '').trim().toLowerCase() !== 'terkoreksi');
+}
+
 function resolveLogModule(activity) {
     const text = String(activity || '').toLowerCase();
     if (text.includes('rab')) return 'RAB';
